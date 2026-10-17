@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { connection } from "next/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import HubungkanTelegram from "@/components/telegram/HubungkanTelegram";
 
 export const instant = false;
 
@@ -17,7 +18,7 @@ export default async function DashboardPage() {
 
   const { data: profil, error: profileError } = await supabase
     .from("users")
-    .select("nama, peran, site_id")
+    .select("nama, peran, site_id, telegram_id")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -41,6 +42,12 @@ export default async function DashboardPage() {
       <p className="text-sm text-gray-600">
         Peran: {profil?.peran ?? "Belum diatur"}
       </p>
+      <div className="mt-4 max-w-sm">
+        <HubungkanTelegram
+          botUsername={process.env.TELEGRAM_BOT_USERNAME ?? ""}
+          sudahTerhubung={Boolean(profil?.telegram_id)}
+        />
+      </div>
       <div className="mt-6 flex gap-3">
         <Link href="/tiket" className="rounded border px-4 py-2">
           Tiket Saya
