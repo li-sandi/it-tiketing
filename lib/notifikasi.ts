@@ -3,7 +3,15 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { escapeHtml, kirimPesan } from "@/lib/telegram";
 
-type NotificationType = "ticket_new" | "ticket_p0" | "ticket_done";
+type NotificationType =
+  | "ticket_new"
+  | "ticket_p0"
+  | "ticket_done"
+  | "sla_respon_mendekati"
+  | "sla_respon_lewat"
+  | "sla_resolusi_mendekati"
+  | "sla_resolusi_lewat"
+  | "auto_close";
 type Recipient = {
   id: string;
   nama: string;
@@ -271,6 +279,20 @@ ${buildTicketLink(ticketId, "Tangani sekarang →")}`;
   return result;
 }
 
+export async function notifyTicketRecipients(
+  ticketId: string,
+  notificationType: NotificationType,
+  recipients: Recipient[],
+  message: string,
+) {
+  const result = await deliver(ticketId, notificationType, recipients, message);
+  const failures = formatFailures(result);
+  if (failures) {
+    throw new Error(`Notifikasi ${notificationType} gagal: ${failures}`);
+  }
+  return result;
+}
+
 export async function notifTiketSelesai(ticketId: string) {
   const data = await loadTicket(ticketId);
   if (!data || data.ticket.status !== "selesai") {
@@ -278,11 +300,6 @@ export async function notifTiketSelesai(ticketId: string) {
   }
   const recipient = data.requester;
   if (!recipient?.telegram_id) return { sent: 0, skipped: 0, failures: [] };
-
-  const chatId = telegramChatId(recipient.telegram_id);
-  if (chatId === null) {
-    throw new Error("ID Telegram pembuat tiket tidak valid.");
-  }
 
   const message = `✅ <b>Tiket Selesai</b>
 ${escapeHtml(data.ticket.nomor_tiket)} — ${escapeHtml(data.category?.nama ?? "-")}
@@ -299,5 +316,32 @@ ${buildTicketLink(ticketId, "Lihat tiket →")}`;
   );
   const failures = formatFailures(result);
   if (failures) throw new Error(`Notifikasi tiket selesai gagal: ${failures}`);
+  return result;
+}
+
+export async function notifTiketDitutupOtomatis(ticketId: string) {
+  const data = await loadTicket(ticketId);
+  if (!data || data.ticket.status !== "ditutup") {
+    return { sent: 0, skipped: 0, failures: [] };
+  }
+
+  const recipient = data.requester;
+  if (!recipient?.telegram_id) return { sent: 0, skipped: 0, failures: [] };
+
+  const message = `ℹ️ <b>Tiket Ditutup Otomatis</b>
+${escapeHtml(data.ticket.nomor_tiket)} — ${escapeHtml(data.category?.nama ?? "-")}
+
+Tiket kamu sudah ditutup otomatis karena belum ada konfirmasi dalam jangka waktu SLA resolusi.
+
+${buildTicketLink(ticketId, "Lihat tiket →")}`;
+
+  const result = await deliver(
+    ticketId,
+    "auto_close",
+    [{ id: recipient.id, nama: recipient.nama, telegram_id: recipient.telegram_id }],
+    message,
+  );
+  const failures = formatFailures(result);
+  if (failures) throw new Error(`Notifikasi auto-close gagal: ${failures}`);
   return result;
 }
