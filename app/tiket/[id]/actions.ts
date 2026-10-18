@@ -6,6 +6,7 @@ import {
   getNextTicketStatuses,
   type TicketStatus,
 } from "@/lib/tiket-status";
+import { notifTiketSelesai } from "@/lib/notifikasi";
 
 type ActionResult = {
   error?: string;
@@ -224,12 +225,30 @@ export async function changeTicketStatus(
     },
   ]);
 
+  let notificationError: string | null = null;
+  if (nextStatus === "selesai") {
+    try {
+      await notifTiketSelesai(ticketId);
+    } catch (error) {
+      notificationError =
+        error instanceof Error
+          ? error.message
+          : "Notifikasi Telegram tiket selesai gagal.";
+      console.error("Gagal mengirim notifikasi tiket selesai:", notificationError);
+    }
+  }
+
   revalidatePath("/tiket");
   revalidatePath(`/tiket/${ticketId}`);
 
-  if (eventError) {
+  const warnings = [
+    eventError && `gagal menulis timeline: ${eventError}`,
+    notificationError && `gagal mengirim notifikasi: ${notificationError}`,
+  ].filter((warning): warning is string => Boolean(warning));
+
+  if (warnings.length) {
     return {
-      notice: `Status berhasil diubah, tetapi gagal menulis timeline: ${eventError}`,
+      notice: `Status berhasil diubah, tetapi ${warnings.join("; ")}.`,
     };
   }
   return { notice: "Status tiket berhasil diubah." };

@@ -41,6 +41,7 @@ export default function TicketForm({
   const [uvId, setUvId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null);
 
   const kategori = categories.find((category) => category.id === categoryId);
@@ -67,6 +68,7 @@ export default function TicketForm({
 
     setLoading(true);
     setError(null);
+    setNotice(null);
 
     const prioritas = hitungPrioritas({
       prioritasDefault: kategori.prioritas_default,
@@ -101,6 +103,28 @@ export default function TicketForm({
       return;
     }
 
+    let notificationWarning: string | null = null;
+    try {
+      const notificationResponse = await fetch("/api/notif/tiket-baru", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticketId: ticket.id }),
+      });
+      const notificationResult = (await notificationResponse.json()) as {
+        error?: string;
+        warnings?: string[];
+      };
+
+      if (!notificationResponse.ok) {
+        notificationWarning =
+          notificationResult.warnings?.join("; ") ??
+          notificationResult.error ??
+          "Notifikasi tiket baru gagal dikirim.";
+      }
+    } catch {
+      notificationWarning = "Tidak dapat menghubungi layanan notifikasi.";
+    }
+
     const remoteRows = [
       ...(anydeskId.trim()
         ? [
@@ -129,12 +153,22 @@ export default function TicketForm({
 
       if (remoteError) {
         setCreatedTicketId(ticket.id);
+        if (notificationWarning) {
+          setNotice(`Notifikasi juga gagal: ${notificationWarning}`);
+        }
         setError(
           `Tiket berhasil dibuat, tetapi ID remote gagal disimpan: ${remoteError.message}`,
         );
         setLoading(false);
         return;
       }
+    }
+
+    if (notificationWarning) {
+      setCreatedTicketId(ticket.id);
+      setNotice(`Tiket dibuat, tetapi notifikasi gagal: ${notificationWarning}`);
+      setLoading(false);
+      return;
     }
 
     router.push("/tiket");
@@ -282,7 +316,16 @@ export default function TicketForm({
         </div>
       )}
 
-      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-red-700">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="text-sm text-amber-700">
+          {notice}
+        </p>
+      )}
 
       {createdTicketId ? (
         <Link
