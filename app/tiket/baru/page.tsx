@@ -54,7 +54,7 @@ export default async function TiketBaruPage() {
   const { data: categories, error: categoriesError } = await supabase
     .from("categories")
     .select(
-      "id, nama, tipe, prioritas_default, prioritas_naik, butuh_aset, bisa_remote",
+      "id, nama, tipe, prioritas_default, prioritas_naik, butuh_aset, butuh_foto, bisa_remote",
     )
     .eq("aktif", true)
     .order("nama");

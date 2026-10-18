@@ -101,6 +101,7 @@ export default async function TicketDetailPage({
     { data: category, error: categoryError },
     siteResult,
     { data: events, error: eventsError },
+    { data: attachments, error: attachmentsError },
   ] = await Promise.all([
     supabase
       .from("categories")
@@ -119,9 +120,26 @@ export default async function TicketDetailPage({
       .select("id, jenis, dari, ke, waktu, aktor_id")
       .eq("ticket_id", ticket.id)
       .order("waktu", { ascending: true }),
+    supabase
+      .from("attachments")
+      .select("id, path_file, jenis")
+      .eq("ticket_id", ticket.id)
+      .order("diunggah_pada", { ascending: true }),
   ]);
 
   const { data: site, error: siteError } = siteResult;
+  const attachmentsWithUrl = await Promise.all(
+    (attachments ?? []).map(async (attachment) => {
+      const { data, error } = await supabase.storage
+        .from("ticket-attachments")
+        .createSignedUrl(attachment.path_file, 3600);
+      return {
+        ...attachment,
+        url: data?.signedUrl ?? null,
+        error: error?.message ?? null,
+      };
+    }),
+  );
   const profileIds = Array.from(
     new Set(
       [
@@ -224,6 +242,43 @@ export default async function TicketDetailPage({
         <h2 className="mb-2 font-medium">Deskripsi</h2>
         <p className="whitespace-pre-wrap">{ticket.deskripsi}</p>
       </section>
+
+      {(attachmentsError || attachmentsWithUrl.length > 0) && (
+        <section className="rounded border p-5">
+          <h2 className="mb-3 font-medium">Lampiran</h2>
+          {attachmentsError ? (
+            <p role="alert" className="text-sm text-red-700">
+              Gagal memuat data lampiran: {attachmentsError.message}
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {attachmentsWithUrl.map((attachment) =>
+                attachment.url ? (
+                  <a
+                    key={attachment.id}
+                    href={attachment.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block overflow-hidden rounded border hover:opacity-90"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={attachment.url}
+                      alt="Lampiran foto tiket"
+                      className="h-40 w-full object-cover"
+                    />
+                  </a>
+                ) : (
+                  <p key={attachment.id} role="alert" className="text-sm text-red-700">
+                    Gagal membuat tautan lampiran:{" "}
+                    {attachment.error ?? "URL file tidak tersedia."}
+                  </p>
+                ),
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="space-y-2 rounded border p-5">
         <h2 className="mb-3 font-medium">SLA</h2>

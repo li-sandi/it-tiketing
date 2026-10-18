@@ -10,6 +10,8 @@ Jalankan berurutan di Supabase SQL Editor (klik "New query", paste, Run):
 6. `migrations/0006_telegram_notification_deliveries.sql` — pencatatan dan deduplikasi pengiriman notifikasi
 7. `migrations/0007_sla_and_autoclose.sql` — notifikasi SLA dan auto-close otomatis
 8. `migrations/0008_auto_close_atomic.sql` — penutupan tiket dan event secara atomik
+9. `migrations/0009_ticket_attachments_storage.sql` — bucket privat dan RLS lampiran gambar tiket
+10. `migrations/0010_server_validated_attachment_upload.sql` — batasi upload lewat endpoint server tervalidasi
 
 Kalau pakai Supabase CLI:
 
@@ -17,7 +19,7 @@ Kalau pakai Supabase CLI:
 
 ## Urutan penting
 
-File dijalankan **berurutan**. 0001 harus selesai sebelum 0002 (karena insert butuh tabel), 0003 sesudah tabel tickets dibuat, 0004 setelah semua tabel tersedia, 0005 setelah kebijakan akses dasar, 0006 setelah tabel tiket tersedia, 0007 setelah notifikasi dan dedup Telegram siap digunakan, dan 0008 setelah tabel tiket serta `ticket_events` tersedia.
+File dijalankan **berurutan**. 0001 harus selesai sebelum 0002 (karena insert butuh tabel), 0003 sesudah tabel tickets dibuat, 0004 setelah semua tabel tersedia, 0005 setelah kebijakan akses dasar, 0006 setelah tabel tiket tersedia, 0007 setelah notifikasi dan dedup Telegram siap digunakan, 0008 setelah tabel tiket serta `ticket_events` tersedia, 0009 setelah tabel `attachments` serta kebijakan akses dasar tersedia, dan 0010 setelah bucket/policy upload dibuat.
 
 ## Telegram (polling lokal)
 
@@ -36,6 +38,8 @@ Jalankan migration 0006 sebelum mengaktifkan notifikasi tiket. Notifikasi tiket 
 
 Setelah itu, jalankan 0007 dan 0008. Migration 0007 menambahkan tipe notifikasi SLA dan auto-close; 0008 menambahkan fungsi untuk menutup tiket dan mencatat event status dalam satu transaksi. Endpoint cron `/api/cron/sla-check` dan `/api/cron/auto-close` memerlukan header `x-cron-secret` yang sama dengan variabel `CRON_SECRET` di `.env.local`. Warning dikirim sekali per tiket, tipe, dan penerima; ambangnya P0 2 menit, P1 5 menit, dan P2/P3 15 menit. Tiket berstatus selesai otomatis ditutup setelah 24 jam.
 
+Jalankan migration 0009 dan 0010 untuk bucket privat `ticket-attachments` (maksimal 5 MB per file; JPEG, PNG, WebP, dan GIF). Upload dilakukan melalui endpoint server terautentikasi yang memverifikasi pemilik tiket serta signature konten file; user hanya dapat membaca lampiran tiket miliknya, sedangkan IT/admin dapat membaca semua lampiran melalui URL bertanda tangan yang berlaku satu jam.
+
 ## Reset database
 
 **Peringatan: perintah berikut menghapus seluruh objek dan data di schema `public`. Gunakan hanya pada project database disposable/tes, dan jangan jalankan pada database berisi data penting.**
@@ -45,4 +49,4 @@ Kalau mau reset total:
     drop schema public cascade;
     create schema public;
 
-Lalu jalankan kedelapan file migration lagi dari awal sesuai urutan di atas.
+Lalu jalankan kesepuluh file migration lagi dari awal sesuai urutan di atas.
