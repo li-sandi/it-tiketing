@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifP0Broadcast, notifTiketBaru } from "@/lib/notifikasi";
 import { hitungPrioritas, parseAturanKenaikan } from "@/lib/prioritas";
 
-// Per-process best-effort limit; replace with a shared store before deployment.
-const RATE_LIMIT = 5;
-const RATE_WINDOW_MS = 15 * 60 * 1000;
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+function createRateLimiter() {
+  return new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(5, "15 m"),
+    analytics: false,
+    prefix: "it-ticketing:public-ticket",
+  });
+}
+
+let rateLimiter: ReturnType<typeof createRateLimiter> | undefined;
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const MAX_REQUEST_SIZE = 6 * 1024 * 1024;
@@ -60,26 +68,6 @@ function jsonError(message: string, status: number) {
     { error: message },
     { status, headers: { "Cache-Control": "no-store" } },
   );
-}
-
-function checkRateLimit(ip: string) {
-  const now = Date.now();
-  const record = rateLimitMap.get(ip);
-
-  if (!record || now >= record.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
-    return { allowed: true, retryAfter: 0 };
-  }
-
-  if (record.count >= RATE_LIMIT) {
-    return {
-      allowed: false,
-      retryAfter: Math.max(1, Math.ceil((record.resetAt - now) / 1000)),
-    };
-  }
-
-  record.count += 1;
-  return { allowed: true, retryAfter: 0 };
 }
 
 function textField(formData: FormData, name: string) {
@@ -138,21 +126,45 @@ export async function POST(request: Request) {
   const ip =
     forwardedFor?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip")?.trim() ||
-    "unknown-ip";
-  const rateLimit = checkRateLimit(ip);
-  if (!rateLimit.allowed) {
-    return NextResponse.json(
-      {
-        error: "Terlalu banyak permintaan. Silakan coba lagi dalam 15 menit.",
-      },
-      {
-        status: 429,
-        headers: {
-          "Cache-Control": "no-store",
-          "Retry-After": String(rateLimit.retryAfter),
+    "127.0.0.1";
+  const redisConfigured =
+    Boolean(process.env.UPSTASH_REDIS_REST_URL) &&
+    Boolean(process.env.UPSTASH_REDIS_REST_TOKEN);
+  if (!redisConfigured) {
+    console.error("Rate limit tiket publik tidak tersedia: konfigurasi Upstash belum lengkap.");
+    return jsonError("Layanan pengaman form sementara tidak tersedia.", 503);
+  }
+
+  try {
+    rateLimiter ??= createRateLimiter();
+    const { success, limit, remaining, reset } = await rateLimiter.limit(ip);
+
+    if (!success) {
+      const secondsRemaining = Math.max(
+        1,
+        Math.ceil((reset - Date.now()) / 1000),
+      );
+      return NextResponse.json(
+        {
+          error: `Terlalu banyak permintaan. Coba lagi dalam ${Math.ceil(secondsRemaining / 60)} menit.`,
         },
-      },
+        {
+          status: 429,
+          headers: {
+            "Cache-Control": "no-store",
+            "X-RateLimit-Limit": String(limit),
+            "X-RateLimit-Remaining": String(remaining),
+            "Retry-After": String(secondsRemaining),
+          },
+        },
+      );
+    }
+  } catch (error) {
+    console.error(
+      "Rate limit tiket publik gagal menghubungi Upstash:",
+      error instanceof Error ? error.message : "Kesalahan Redis tidak diketahui.",
     );
+    return jsonError("Layanan pengaman form sementara tidak tersedia.", 503);
   }
 
   let formData: FormData;
