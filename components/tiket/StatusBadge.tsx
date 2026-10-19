@@ -15,10 +15,10 @@ const statusColors: Record<TicketStatus, string> = {
 };
 
 const priorityColors: Record<string, string> = {
-  P0: "bg-red-600 text-white",
-  P1: "bg-orange-500 text-white",
-  P2: "bg-yellow-400 text-black",
-  P3: "bg-gray-300 text-black",
+  P0: "bg-red-700 text-white",
+  P1: "bg-orange-700 text-white",
+  P2: "bg-yellow-200 text-yellow-950",
+  P3: "bg-gray-200 text-gray-800",
 };
 
 export function StatusBadge({ status }: { status: string }) {

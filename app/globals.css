@@ -1,8 +1,55 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --background: #f4f7fb;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --foreground: #172033;
+  --muted: #5c687b;
+  --border: #dce3ed;
+  --border-strong: #c3cedd;
+  --accent: #2457d6;
+  --accent-hover: #1d46b2;
+  --focus-ring: #6b91f0;
+  --danger-surface: #fef2f2;
+  --danger-border: #fecaca;
+  --danger-text: #b42318;
+  --success-surface: #ecfdf3;
+  --success-border: #bbf7d0;
+  --success-text: #167243;
+  --warning-surface: #fffbeb;
+  --warning-border: #fde68a;
+  --warning-text: #854d0e;
+  --info-surface: #eff6ff;
+  --info-border: #bfdbfe;
+  --info-text: #1e40af;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0b1120;
+  --surface: #121c2e;
+  --surface-muted: #1b2940;
+  --foreground: #e7edf7;
+  --muted: #a2aec1;
+  --border: #2b3950;
+  --border-strong: #40516b;
+  --accent: #7ca3ff;
+  --accent-hover: #9bb8ff;
+  --focus-ring: #84a8ff;
+  --danger-surface: #351d2a;
+  --danger-border: #713344;
+  --danger-text: #ffb4b4;
+  --success-surface: #153226;
+  --success-border: #285c43;
+  --success-text: #8be0ad;
+  --warning-surface: #382d1b;
+  --warning-border: #685129;
+  --warning-text: #f7d58b;
+  --info-surface: #182d4d;
+  --info-border: #2d4f81;
+  --info-text: #b8d0ff;
 }
 
 @theme inline {
@@ -12,15 +59,245 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
 }
 
 body {
+  min-height: 100%;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+input,
+select,
+textarea {
+  border-color: var(--border-strong);
+  background-color: var(--surface);
+  color: var(--foreground);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+button.bg-black {
+  background-color: var(--accent);
+}
+
+button.bg-blue-600 {
+  background-color: var(--accent);
+}
+
+button.bg-black:hover,
+button.bg-blue-600:hover,
+a.bg-black:hover {
+  background-color: var(--accent-hover);
+}
+
+[class~="hover:bg-gray-800"]:hover {
+  background-color: var(--accent-hover);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--foreground);
+}
+
+/* Keep existing Tailwind color utilities readable in both explicit themes. */
+:root[data-theme="dark"] .bg-white {
+  background-color: var(--surface);
+}
+
+:root[data-theme="dark"] .bg-gray-50,
+:root[data-theme="dark"] [class~="hover:bg-gray-50"]:hover {
+  background-color: var(--background);
+}
+
+:root[data-theme="dark"] .bg-gray-100,
+:root[data-theme="dark"] [class~="hover:bg-gray-100"]:hover {
+  background-color: var(--surface-muted);
+}
+
+:root[data-theme="dark"] .bg-gray-200,
+:root[data-theme="dark"] .bg-gray-300 {
+  background-color: var(--border-strong);
+}
+
+:root[data-theme="dark"] .bg-black {
+  background-color: #315fc9;
+}
+
+:root[data-theme="dark"] button.bg-black:hover,
+:root[data-theme="dark"] button.bg-blue-600:hover,
+:root[data-theme="dark"] a.bg-black:hover {
+  background-color: #244ba8;
+}
+
+:root[data-theme="dark"] [class~="hover:bg-gray-800"]:hover {
+  background-color: #244ba8;
+}
+
+:root[data-theme="dark"] .text-black,
+:root[data-theme="dark"] .text-gray-800,
+:root[data-theme="dark"] .text-gray-900 {
+  color: var(--foreground);
+}
+
+:root[data-theme="dark"] .text-gray-700,
+:root[data-theme="dark"] .text-gray-600,
+:root[data-theme="dark"] .text-gray-500,
+:root[data-theme="dark"] .text-gray-400,
+:root[data-theme="dark"] .text-gray-300 {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] [class~="hover:text-black"]:hover {
+  color: var(--foreground);
+}
+
+:root[data-theme="dark"] [class~="bg-blue-50"],
+:root[data-theme="dark"] [class~="bg-blue-100"] {
+  background-color: var(--info-surface);
+}
+
+:root[data-theme="dark"] [class~="bg-blue-200"] {
+  background-color: var(--info-surface);
+}
+
+:root[data-theme="dark"] [class~="border-blue-200"] {
+  border-color: var(--info-border);
+}
+
+:root[data-theme="dark"] [class~="text-blue-600"],
+:root[data-theme="dark"] [class~="text-blue-700"],
+:root[data-theme="dark"] [class~="text-blue-800"] {
+  color: var(--info-text);
+}
+
+:root[data-theme="dark"] [class~="bg-red-50"],
+:root[data-theme="dark"] [class~="bg-red-100"] {
+  background-color: var(--danger-surface);
+}
+
+:root[data-theme="dark"] [class~="bg-red-200"] {
+  background-color: var(--danger-surface);
+}
+
+:root[data-theme="dark"] [class~="bg-red-700"] {
+  background-color: #7f1d1d;
+}
+
+:root[data-theme="dark"] [class~="border-red-200"],
+:root[data-theme="dark"] [class~="border-red-300"] {
+  border-color: var(--danger-border);
+}
+
+:root[data-theme="dark"] [class~="text-red-600"],
+:root[data-theme="dark"] [class~="text-red-700"],
+:root[data-theme="dark"] [class~="text-red-800"] {
+  color: var(--danger-text);
+}
+
+:root[data-theme="dark"] [class~="bg-green-50"],
+:root[data-theme="dark"] [class~="bg-green-100"] {
+  background-color: var(--success-surface);
+}
+
+:root[data-theme="dark"] [class~="bg-green-200"] {
+  background-color: var(--success-surface);
+}
+
+:root[data-theme="dark"] [class~="border-green-200"] {
+  border-color: var(--success-border);
+}
+
+:root[data-theme="dark"] [class~="text-green-600"],
+:root[data-theme="dark"] [class~="text-green-700"],
+:root[data-theme="dark"] [class~="text-green-800"] {
+  color: var(--success-text);
+}
+
+:root[data-theme="dark"] [class~="bg-yellow-50"],
+:root[data-theme="dark"] [class~="bg-yellow-100"],
+:root[data-theme="dark"] [class~="bg-yellow-200"] {
+  background-color: var(--warning-surface);
+}
+
+:root[data-theme="dark"] [class~="bg-yellow-400"] {
+  background-color: #74561d;
+}
+
+:root[data-theme="dark"] [class~="border-yellow-200"] {
+  border-color: var(--warning-border);
+}
+
+:root[data-theme="dark"] [class~="text-yellow-800"] {
+  color: var(--warning-text);
+}
+
+:root[data-theme="dark"] [class~="text-yellow-950"] {
+  color: var(--warning-text);
+}
+
+:root[data-theme="dark"] [class~="bg-orange-100"],
+:root[data-theme="dark"] [class~="bg-orange-500"] {
+  background-color: #713d25;
+}
+
+:root[data-theme="dark"] [class~="bg-orange-700"] {
+  background-color: #7c2d12;
+}
+
+:root[data-theme="dark"] [class~="text-orange-800"] {
+  color: #ffd0a8;
+}
+
+:root[data-theme="dark"] [class~="bg-purple-100"] {
+  background-color: #382958;
+}
+
+:root[data-theme="dark"] [class~="text-purple-800"] {
+  color: #dbc6ff;
+}
+
+:root[data-theme="dark"] [class~="bg-pink-100"] {
+  background-color: #51283f;
+}
+
+:root[data-theme="dark"] [class~="text-pink-800"] {
+  color: #ffc2e0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
