@@ -15,6 +15,8 @@ Jalankan berurutan di Supabase SQL Editor (klik "New query", paste, Run):
 11. `migrations/0011_user_ticket_rating.sql` — tutup tiket oleh pembuat dengan rating dan event atomik
 12. `migrations/0012_public_tickets.sql` — identitas pembuat publik dan token akses privat
 13. `migrations/0013_public_ticket_rating.sql` — penutupan tiket publik dengan rating atomik
+14. `migrations/0014_remove_kota_baru_site.sql` — hapus site Kota Baru dan kosongkan relasi site user/tiket/jadwal tanpa menghapus record terkait
+15. `migrations/0015_replace_sleman_schedule.sql` — fungsi atomik untuk mengganti jadwal kunjungan Sleman dalam satu periode
 
 Kalau pakai Supabase CLI:
 
@@ -22,7 +24,13 @@ Kalau pakai Supabase CLI:
 
 ## Urutan penting
 
-File dijalankan **berurutan**. 0001 harus selesai sebelum 0002 (karena insert butuh tabel), 0003 sesudah tabel tickets dibuat, 0004 setelah semua tabel tersedia, 0005 setelah kebijakan akses dasar, 0006 setelah tabel tiket tersedia, 0007 setelah notifikasi dan dedup Telegram siap digunakan, 0008 setelah tabel tiket serta `ticket_events` tersedia, 0009 setelah tabel `attachments` serta kebijakan akses dasar tersedia, 0010 setelah bucket/policy upload dibuat, 0011 setelah tabel tiket serta kebijakan dasar tersedia, 0012 setelah tabel tiket tersedia, dan 0013 setelah kolom token publik ditambahkan.
+File dijalankan **berurutan**. 0001 harus selesai sebelum 0002 (karena insert butuh tabel), 0003 sesudah tabel tickets dibuat, 0004 setelah semua tabel tersedia, 0005 setelah kebijakan akses dasar, 0006 setelah tabel tiket tersedia, 0007 setelah notifikasi dan dedup Telegram siap digunakan, 0008 setelah tabel tiket serta `ticket_events` tersedia, 0009 setelah tabel `attachments` serta kebijakan akses dasar tersedia, 0010 setelah bucket/policy upload dibuat, 0011 setelah tabel tiket serta kebijakan dasar tersedia, 0012 setelah tabel tiket tersedia, 0013 setelah kolom token publik ditambahkan, 0014 setelah tabel users/tickets/jadwal dibuat, dan 0015 setelah tabel `it_schedule` serta peran `service_role` tersedia.
+
+Migrasi `0014` menghapus baris site Kota Baru. User, tiket, dan jadwal yang
+merujuk ke site tersebut tetap disimpan dengan `site_id` bernilai `NULL`.
+Migrasi `0015` membuat fungsi `replace_sleman_schedule`, yang hanya dapat
+dijalankan oleh `service_role`. Fungsi ini mengganti jadwal kunjungan Sleman
+secara atomik; aplikasi memakainya untuk generator jadwal pada Admin Panel.
 
 ## Telegram (polling lokal)
 
@@ -60,4 +68,4 @@ Kalau mau reset total:
     drop schema public cascade;
     create schema public;
 
-Lalu jalankan ketiga belas file migration lagi dari awal sesuai urutan di atas.
+Lalu jalankan kelima belas file migration lagi dari awal sesuai urutan di atas.

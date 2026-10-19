@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+import AdminNavigation from "@/components/admin/AdminNavigation";
 import { createClient } from "@/lib/supabase/server";
 
 export const instant = false;
@@ -26,21 +26,8 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <nav className="flex gap-6 border-b bg-white px-8 py-4">
-        <Link href="/dashboard" className="font-semibold text-gray-500 hover:text-black">
-          ← Dashboard
-        </Link>
-        <Link href="/admin/kategori" className="font-semibold hover:text-blue-600">
-          Kategori
-        </Link>
-        <Link href="/admin/users" className="font-semibold hover:text-blue-600">
-          Users
-        </Link>
-        <Link href="/admin/jadwal" className="font-semibold hover:text-blue-600">
-          Jadwal
-        </Link>
-      </nav>
-      <main className="mx-auto max-w-5xl p-8">{children}</main>
+      <AdminNavigation />
+      <main className="mx-auto w-full max-w-5xl p-4 sm:p-8">{children}</main>
     </div>
   );
 }
