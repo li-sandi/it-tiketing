@@ -15,6 +15,8 @@ dan Telegram.
   Sleman.
 - Generator jadwal Selasa/Kamis selama delapan minggu, bergantian antara Miko
   dan Fuad.
+- Tiket site Sleman pada hari kunjungan otomatis ditugaskan dan dinotifikasikan
+  kepada IT yang bertugas; tiket P1 mendapat batas resolusi akhir hari WIB.
 - Rate limiting form publik menggunakan Upstash Redis.
 
 ## Teknologi
@@ -103,6 +105,8 @@ fitur admin tersedia dari navigasi bersama di bagian atas halaman.
   sambil mempertahankan record-nya.
 - Terapkan migrasi `0015_replace_sleman_schedule.sql` sebelum menggunakan
   generator jadwal.
+- Terapkan migrasi `0016_route_sleman_tickets.sql` untuk routing tiket Sleman
+  ke petugas kunjungan dan SLA resolusi P1 pada hari kunjungan.
 - Deployment Vercel memerlukan environment variables yang sama dengan
   `.env.local`. Atur `NEXT_PUBLIC_APP_URL` ke domain produksi.
 - Endpoint `/api/cron/sla-check` dan `/api/cron/auto-close` dilindungi oleh

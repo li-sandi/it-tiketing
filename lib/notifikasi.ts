@@ -141,7 +141,7 @@ async function loadTicket(ticketId: string) {
   const { data: ticket, error: ticketError } = await admin
     .from("tickets")
     .select(
-      "id, nomor_tiket, prioritas, deskripsi, penanganan, site_id, pembuat_id, pembuat_nama, category_id, status, tipe",
+      "id, nomor_tiket, prioritas, deskripsi, penanganan, site_id, it_id, sla_resolusi_batas, pembuat_id, pembuat_nama, category_id, status, tipe",
     )
     .eq("id", ticketId)
     .maybeSingle();
@@ -199,38 +199,87 @@ export async function notifTiketBaru(ticketId: string) {
   }
 
   const admin = createAdminClient();
-  const { data: siteIts, error: siteItsError } = await admin
-    .from("users")
-    .select("id, nama, telegram_id")
-    .eq("peran", "it")
-    .eq("site_id", data.ticket.site_id)
-    .not("telegram_id", "is", null);
-  if (siteItsError) throw new Error(`Gagal mencari IT di site: ${siteItsError.message}`);
+  let assignedName: string | null = null;
+  let targets: Recipient[];
+  if (data.ticket.it_id) {
+    const { data: assignedIt, error: assignedItError } = await admin
+      .from("users")
+      .select("id, nama, telegram_id")
+      .eq("id", data.ticket.it_id)
+      .eq("peran", "it")
+      .maybeSingle();
+    if (assignedItError) {
+      throw new Error(`Gagal mencari IT petugas jadwal: ${assignedItError.message}`);
+    }
+    if (!assignedIt) {
+      throw new Error("IT yang ditugaskan ke tiket tidak ditemukan.");
+    }
+    assignedName = assignedIt.nama;
+    targets = staffRecipients([assignedIt]);
+    if (!targets.length) {
+      throw new Error(
+        `IT petugas jadwal ${assignedIt.nama} belum menghubungkan Telegram.`,
+      );
+    }
+  } else {
+    let siteItsQuery = admin
+      .from("users")
+      .select("id, nama, telegram_id")
+      .eq("peran", "it")
+      .not("telegram_id", "is", null);
+    if (data.site?.nama !== "Sleman") {
+      siteItsQuery = siteItsQuery.eq("site_id", data.ticket.site_id);
+    }
+    const { data: siteIts, error: siteItsError } = await siteItsQuery;
+    if (siteItsError) {
+      throw new Error(`Gagal mencari IT penerima tiket: ${siteItsError.message}`);
+    }
 
-  const candidates = staffRecipients(siteIts);
-  const { data: freeStatuses, error: statusError } = candidates.length
-    ? await admin
-        .from("it_status")
-        .select("it_id")
-        .in(
-          "it_id",
-          candidates.map((recipient) => recipient.id),
-        )
-        .eq("status", "free")
-    : { data: [], error: null };
-  if (statusError) {
-    throw new Error(`Gagal memeriksa status IT: ${statusError.message}`);
+    const candidates = staffRecipients(siteIts);
+    const { data: freeStatuses, error: statusError } = candidates.length
+      ? await admin
+          .from("it_status")
+          .select("it_id")
+          .in(
+            "it_id",
+            candidates.map((recipient) => recipient.id),
+          )
+          .eq("status", "free")
+      : { data: [], error: null };
+    if (statusError) {
+      throw new Error(`Gagal memeriksa status IT: ${statusError.message}`);
+    }
+
+    const freeIds = new Set((freeStatuses ?? []).map((status) => status.it_id));
+    const freeIts = candidates.filter((recipient) => freeIds.has(recipient.id));
+    targets = freeIts.length ? freeIts : candidates;
   }
 
-  const freeIds = new Set((freeStatuses ?? []).map((status) => status.it_id));
-  const freeIts = candidates.filter((recipient) => freeIds.has(recipient.id));
-  const targets = freeIts.length ? freeIts : candidates;
   const emoji = data.ticket.prioritas === "P0" ? "🚨" : "🎫";
+  const resolutionDeadline = data.ticket.sla_resolusi_batas
+    ? new Intl.DateTimeFormat("id-ID", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "Asia/Jakarta",
+      }).format(new Date(data.ticket.sla_resolusi_batas))
+    : null;
+  const deadlineLine =
+    data.site?.nama === "Sleman" &&
+    data.ticket.it_id &&
+    data.ticket.prioritas === "P1" &&
+    resolutionDeadline
+      ? `\nBatas resolusi hari ini: ${escapeHtml(resolutionDeadline)}`
+      : "";
+  const assignmentLine = assignedName
+    ? `Petugas kunjungan: ${escapeHtml(assignedName)}`
+    : "";
   const message = `${emoji} <b>Tiket Baru ${escapeHtml(data.ticket.prioritas)}</b>
 ${escapeHtml(data.ticket.nomor_tiket)} — ${escapeHtml(data.category?.nama ?? "-")}
 Site: ${escapeHtml(data.site?.nama ?? "-")}
+${assignmentLine}
 Dari: ${escapeHtml(data.requester?.nama ?? data.ticket.pembuat_nama ?? "-")}
 Penanganan: ${escapeHtml(data.ticket.penanganan)}
+${deadlineLine}
 
 ${compactDescription(data.ticket.deskripsi)}
 

@@ -51,24 +51,30 @@ export default async function AntrianPage() {
 
   const ticketFields =
     "id, nomor_tiket, deskripsi, prioritas, status, dibuat_pada, categories(nama), sites(nama)";
+  let queueQuery = supabase
+    .from("tickets")
+    .select(ticketFields)
+    .eq("status", "baru");
+  if (profile.peran === "it") {
+    queueQuery = queueQuery.is("it_id", null);
+  }
+  const myTicketStatuses = [
+    ...(profile.peran === "it" ? ["baru"] : []),
+    "diproses",
+    "menunggu_user",
+    "dijadwalkan_kunjungan",
+    "menunggu_pengadaan",
+  ];
   const [{ data: queue, error: queueError }, { data: myTickets, error: myTicketsError }] =
     await Promise.all([
-      supabase
-        .from("tickets")
-        .select(ticketFields)
-        .eq("status", "baru")
+      queueQuery
         .order("prioritas", { ascending: true })
         .order("dibuat_pada", { ascending: true }),
       supabase
         .from("tickets")
         .select(ticketFields)
         .eq("it_id", user.id)
-        .in("status", [
-          "diproses",
-          "menunggu_user",
-          "dijadwalkan_kunjungan",
-          "menunggu_pengadaan",
-        ])
+        .in("status", myTicketStatuses)
         .order("prioritas", { ascending: true })
         .order("dibuat_pada", { ascending: true }),
     ]);
