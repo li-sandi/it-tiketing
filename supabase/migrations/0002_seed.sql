@@ -3,8 +3,7 @@
 insert into sites (id, nama, punya_it, jumlah_user) values
   ('11111111-1111-1111-1111-111111111111', 'Terban',    true,  195),
   ('22222222-2222-2222-2222-222222222222', 'Ngampilan', true,  60),
-  ('33333333-3333-3333-3333-333333333333', 'Sleman',    false, 40),
-  ('44444444-4444-4444-4444-444444444444', 'Kota Baru', true,  50);
+  ('33333333-3333-3333-3333-333333333333', 'Sleman',    false, 40);
 
 insert into categories
 (nama, tipe, prioritas_default, prioritas_naik, butuh_aset, butuh_foto, bisa_remote, butuh_approval) values
