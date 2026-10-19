@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import SlaTimer from "@/components/tiket/SlaTimer";
 import TicketActions from "@/components/tiket/TicketActions";
-import RemoteSecretButton from "@/components/tiket/RemoteSecretButton";
 import UserRatingForm from "@/components/tiket/UserRatingForm";
 import { PrioritasBadge, StatusBadge } from "@/components/tiket/StatusBadge";
 import { createClient } from "@/lib/supabase/server";
@@ -328,10 +327,8 @@ export default async function TicketDetailPage({
           )}
           <p className="mt-3 text-xs text-gray-500">
             Hanya IT yang ditugaskan dan admin yang dapat melihat ID. Password
-            tidak pernah masuk database; password sementara hanya dapat diambil
-            sekali selama 5 menit.
+            tidak disimpan; minta password terbaru langsung kepada pelapor.
           </p>
-          <RemoteSecretButton ticketId={ticket.id} />
         </section>
       )}
 

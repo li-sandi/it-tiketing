@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { storeRemoteSecret } from "@/lib/redis";
 import { notifP0Broadcast, notifTiketBaru } from "@/lib/notifikasi";
 import { hitungPrioritas, parseAturanKenaikan } from "@/lib/prioritas";
 
@@ -61,11 +60,6 @@ function jsonError(message: string, status: number) {
 function textField(formData: FormData, name: string) {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
-}
-
-function rawTextField(formData: FormData, name: string) {
-  const value = formData.get(name);
-  return typeof value === "string" ? value : "";
 }
 
 function isPriority(value: string): value is "P0" | "P1" | "P2" | "P3" {
@@ -136,8 +130,6 @@ export async function POST(request: Request) {
   const penanganan = textField(formData, "penanganan");
   const anydeskId = textField(formData, "anydeskId");
   const uvId = textField(formData, "uvId");
-  const anydeskPassword = rawTextField(formData, "anydeskPassword");
-  const uvPassword = rawTextField(formData, "uvPassword");
   const fileValue = formData.get("file");
   if (fileValue instanceof File && fileValue.size === 0) {
     return jsonError("File lampiran kosong.", 400);
@@ -163,15 +155,6 @@ export async function POST(request: Request) {
     uvId.length > 120
   ) {
     return jsonError("Nomor aset atau ID remote terlalu panjang.", 400);
-  }
-  if (anydeskPassword.length > 512 || uvPassword.length > 512) {
-    return jsonError("Password remote terlalu panjang.", 400);
-  }
-  if (anydeskPassword.trim() && !anydeskId) {
-    return jsonError("Isi ID AnyDesk sebelum mengirim password-nya.", 400);
-  }
-  if (uvPassword.trim() && !uvId) {
-    return jsonError("Isi ID UV sebelum mengirim password-nya.", 400);
   }
   if (penanganan !== "remote" && penanganan !== "onsite") {
     return jsonError("Pilihan penanganan tidak valid.", 400);
@@ -368,25 +351,6 @@ export async function POST(request: Request) {
         500,
       );
     }
-  }
-
-  try {
-    await storeRemoteSecret(ticket.id, {
-      ...(anydeskPassword.trim() ? { anydeskPassword } : {}),
-      ...(uvPassword.trim() ? { uvPassword } : {}),
-    });
-  } catch (error) {
-    const cleanupError = await rollbackTicket(admin, ticket.id, uploadedPath);
-    console.error(
-      "Gagal menyimpan password tiket publik sementara:",
-      error instanceof Error ? error.message : "Kesalahan Redis.",
-    );
-    return jsonError(
-      cleanupError
-        ? `Password tidak dapat disimpan aman dan tiket gagal dibatalkan: ${cleanupError}`
-        : "Layanan password sementara tidak tersedia. Tiket belum dibuat.",
-      503,
-    );
   }
 
   const notificationResults = await Promise.allSettled([

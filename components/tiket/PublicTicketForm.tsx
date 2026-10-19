@@ -38,8 +38,6 @@ export default function PublicTicketForm({
   const [penanganan, setPenanganan] = useState<"onsite" | "remote">("onsite");
   const [anydeskId, setAnydeskId] = useState("");
   const [uvId, setUvId] = useState("");
-  const [anydeskPassword, setAnydeskPassword] = useState("");
-  const [uvPassword, setUvPassword] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,8 +85,6 @@ export default function PublicTicketForm({
     formData.set("nomorAset", nomorAset);
     formData.set("anydeskId", anydeskId);
     formData.set("uvId", uvId);
-    formData.set("anydeskPassword", anydeskPassword);
-    formData.set("uvPassword", uvPassword);
     if (file) formData.set("file", file);
 
     try {
@@ -102,6 +98,11 @@ export default function PublicTicketForm({
       };
       if (!response.ok || !result.token) {
         throw new Error(result.error ?? "Gagal membuat tiket.");
+      }
+      try {
+        window.localStorage.setItem("public-ticket-access-token", result.token);
+      } catch (storageError) {
+        console.warn("Token tiket publik tidak dapat disimpan untuk auto-fill:", storageError);
       }
       router.push(`/status/${result.token}`);
     } catch (submitError) {
@@ -180,8 +181,6 @@ export default function PublicTicketForm({
             setPenanganan("onsite");
             setAnydeskId("");
             setUvId("");
-            setAnydeskPassword("");
-            setUvPassword("");
           }}
           required
           className="w-full rounded border px-3 py-2"
@@ -297,12 +296,8 @@ export default function PublicTicketForm({
         assetNumber={nomorAset}
         anydeskId={anydeskId}
         uvId={uvId}
-        anydeskPassword={anydeskPassword}
-        uvPassword={uvPassword}
         onAnydeskIdChange={setAnydeskId}
         onUvIdChange={setUvId}
-        onAnydeskPasswordChange={setAnydeskPassword}
-        onUvPasswordChange={setUvPassword}
       />
 
       {error && (

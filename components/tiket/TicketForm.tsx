@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import RemoteCredentialFields from "@/components/tiket/RemoteCredentialFields";
 import {
   hitungPrioritas,
   parseAturanKenaikan,
@@ -133,7 +134,6 @@ export default function TicketForm({
       setError("Isi file tidak cocok dengan format gambar yang dipilih.");
       return;
     }
-
     setLoading(true);
     setError(null);
     setNotice(null);
@@ -216,7 +216,7 @@ export default function TicketForm({
         : []),
     ];
 
-    if (penanganan === "remote" && remoteRows.length > 0) {
+    if (remoteRows.length > 0) {
       const { error: remoteError } = await supabase
         .from("remote_credentials")
         .insert(remoteRows);
@@ -427,37 +427,13 @@ export default function TicketForm({
         </div>
       </fieldset>
 
-      {penanganan === "remote" && kategori?.bisa_remote && (
-        <div className="space-y-3 border-l-4 border-blue-200 pl-4">
-          <div>
-            <label htmlFor="anydesk-id" className="mb-1 block text-sm font-medium">
-              ID AnyDesk (opsional)
-            </label>
-            <input
-              id="anydesk-id"
-              type="text"
-              value={anydeskId}
-              onChange={(event) => setAnydeskId(event.target.value)}
-              className="w-full rounded border px-3 py-2"
-            />
-          </div>
-          <div>
-            <label htmlFor="uv-id" className="mb-1 block text-sm font-medium">
-              UV ID (opsional)
-            </label>
-            <input
-              id="uv-id"
-              type="text"
-              value={uvId}
-              onChange={(event) => setUvId(event.target.value)}
-              className="w-full rounded border px-3 py-2"
-            />
-          </div>
-          <p className="text-sm text-gray-600">
-            Password UV akan diminta IT lewat chat/telepon.
-          </p>
-        </div>
-      )}
+      <RemoteCredentialFields
+        assetNumber={nomorAset}
+        anydeskId={anydeskId}
+        uvId={uvId}
+        onAnydeskIdChange={setAnydeskId}
+        onUvIdChange={setUvId}
+      />
 
       {error && (
         <p role="alert" className="text-sm text-red-700">
