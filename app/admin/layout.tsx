@@ -36,6 +36,9 @@ export default async function AdminLayout({
         <Link href="/admin/users" className="font-semibold hover:text-blue-600">
           Users
         </Link>
+        <Link href="/admin/jadwal" className="font-semibold hover:text-blue-600">
+          Jadwal
+        </Link>
       </nav>
       <main className="mx-auto max-w-5xl p-8">{children}</main>
     </div>
