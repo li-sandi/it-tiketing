@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import RemoteCredentialFields from "@/components/tiket/RemoteCredentialFields";
 import {
   hitungPrioritas,
   parseAturanKenaikan,
@@ -87,6 +88,8 @@ export default function TicketForm({
   const [penanganan, setPenanganan] = useState<"remote" | "onsite">("onsite");
   const [anydeskId, setAnydeskId] = useState("");
   const [uvId, setUvId] = useState("");
+  const [anydeskPassword, setAnydeskPassword] = useState("");
+  const [uvPassword, setUvPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -131,6 +134,14 @@ export default function TicketForm({
     }
     if (file && !(await hasSupportedImageSignature(file))) {
       setError("Isi file tidak cocok dengan format gambar yang dipilih.");
+      return;
+    }
+    if (anydeskPassword.trim() && !anydeskId.trim()) {
+      setError("Isi ID AnyDesk sebelum mengirim password-nya.");
+      return;
+    }
+    if (uvPassword.trim() && !uvId.trim()) {
+      setError("Isi ID UV sebelum mengirim password-nya.");
       return;
     }
 
@@ -216,7 +227,7 @@ export default function TicketForm({
         : []),
     ];
 
-    if (penanganan === "remote" && remoteRows.length > 0) {
+    if (remoteRows.length > 0) {
       const { error: remoteError } = await supabase
         .from("remote_credentials")
         .insert(remoteRows);
@@ -225,6 +236,34 @@ export default function TicketForm({
         console.error("Gagal menyimpan ID remote tiket:", remoteError.message);
         postCreateWarnings.push(
           `ID remote gagal disimpan: ${remoteError.message}`,
+        );
+      }
+    }
+
+    if (anydeskPassword.trim() || uvPassword.trim()) {
+      try {
+        const secretResponse = await fetch(
+          `/api/tiket/${encodeURIComponent(ticket.id)}/remote-secret`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              anydeskPassword,
+              uvPassword,
+            }),
+          },
+        );
+        const secretResult = (await secretResponse.json()) as {
+          error?: string;
+        };
+        if (!secretResponse.ok) {
+          postCreateWarnings.push(
+            secretResult.error ?? "Password sementara gagal dikirim.",
+          );
+        }
+      } catch {
+        postCreateWarnings.push(
+          "Tidak dapat menghubungi layanan password sementara.",
         );
       }
     }
@@ -280,6 +319,8 @@ export default function TicketForm({
             setPenanganan("onsite");
             setAnydeskId("");
             setUvId("");
+            setAnydeskPassword("");
+            setUvPassword("");
           }}
           required
           className="w-full rounded border px-3 py-2"
@@ -427,37 +468,17 @@ export default function TicketForm({
         </div>
       </fieldset>
 
-      {penanganan === "remote" && kategori?.bisa_remote && (
-        <div className="space-y-3 border-l-4 border-blue-200 pl-4">
-          <div>
-            <label htmlFor="anydesk-id" className="mb-1 block text-sm font-medium">
-              ID AnyDesk (opsional)
-            </label>
-            <input
-              id="anydesk-id"
-              type="text"
-              value={anydeskId}
-              onChange={(event) => setAnydeskId(event.target.value)}
-              className="w-full rounded border px-3 py-2"
-            />
-          </div>
-          <div>
-            <label htmlFor="uv-id" className="mb-1 block text-sm font-medium">
-              UV ID (opsional)
-            </label>
-            <input
-              id="uv-id"
-              type="text"
-              value={uvId}
-              onChange={(event) => setUvId(event.target.value)}
-              className="w-full rounded border px-3 py-2"
-            />
-          </div>
-          <p className="text-sm text-gray-600">
-            Password UV akan diminta IT lewat chat/telepon.
-          </p>
-        </div>
-      )}
+      <RemoteCredentialFields
+        assetNumber={nomorAset}
+        anydeskId={anydeskId}
+        uvId={uvId}
+        anydeskPassword={anydeskPassword}
+        uvPassword={uvPassword}
+        onAnydeskIdChange={setAnydeskId}
+        onUvIdChange={setUvId}
+        onAnydeskPasswordChange={setAnydeskPassword}
+        onUvPasswordChange={setUvPassword}
+      />
 
       {error && (
         <p role="alert" className="text-sm text-red-700">
