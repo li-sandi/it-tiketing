@@ -25,7 +25,7 @@ const statusTransitions: Record<TicketStatus, readonly TicketStatus[]> = {
   menunggu_user: ["diproses"],
   dijadwalkan_kunjungan: ["diproses"],
   menunggu_pengadaan: ["diproses"],
-  selesai: ["ditutup"],
+  selesai: [],
   ditutup: [],
 };
 

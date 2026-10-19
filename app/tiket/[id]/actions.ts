@@ -253,3 +253,47 @@ export async function changeTicketStatus(
   }
   return { notice: "Status tiket berhasil diubah." };
 }
+
+export async function tutupTiketOlehUser(
+  ticketId: string,
+  rating: number,
+): Promise<ActionResult> {
+  if (!uuidPattern.test(ticketId)) return { error: "ID tiket tidak valid." };
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return { error: "Rating harus 1-5." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) return { error: "Belum login." };
+
+  const { data: ticket, error: readError } = await supabase
+    .from("tickets")
+    .select("pembuat_id, status")
+    .eq("id", ticketId)
+    .maybeSingle();
+
+  if (readError) return { error: `Gagal membaca tiket: ${readError.message}` };
+  if (!ticket) return { error: "Tiket tidak ditemukan." };
+  if (ticket.pembuat_id !== user.id) {
+    return { error: "Hanya pembuat tiket yang bisa menutup." };
+  }
+  if (ticket.status !== "selesai") {
+    return { error: "Tiket belum selesai atau sudah ditutup." };
+  }
+
+  const { error: closeError } = await supabase.rpc("close_ticket_by_creator", {
+    p_ticket_id: ticketId,
+    p_rating: rating,
+  });
+
+  if (closeError) return { error: `Gagal menutup tiket: ${closeError.message}` };
+
+  revalidatePath(`/tiket/${ticketId}`);
+  revalidatePath("/tiket");
+  return { notice: "Tiket berhasil ditutup. Terima kasih atas rating Anda." };
+}

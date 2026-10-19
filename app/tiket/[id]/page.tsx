@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { connection } from "next/server";
 import SlaTimer from "@/components/tiket/SlaTimer";
 import TicketActions from "@/components/tiket/TicketActions";
+import RemoteSecretButton from "@/components/tiket/RemoteSecretButton";
+import UserRatingForm from "@/components/tiket/UserRatingForm";
 import { PrioritasBadge, StatusBadge } from "@/components/tiket/StatusBadge";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -81,7 +83,7 @@ export default async function TicketDetailPage({
   const { data: ticket, error: ticketError } = await supabase
     .from("tickets")
     .select(
-      "id, nomor_tiket, pembuat_id, site_id, category_id, deskripsi, prioritas, jumlah_user_terdampak, nomor_aset, penanganan, status, it_id, dibuat_pada, diproses_pada, sla_respon_batas, sla_resolusi_batas",
+      "id, nomor_tiket, pembuat_id, site_id, category_id, deskripsi, prioritas, jumlah_user_terdampak, nomor_aset, penanganan, status, it_id, dibuat_pada, diproses_pada, selesai_pada, ditutup_pada, rating, sla_respon_batas, sla_resolusi_batas",
     )
     .eq("id", id)
     .maybeSingle();
@@ -96,6 +98,7 @@ export default async function TicketDetailPage({
     );
   }
   if (!ticket || (!isStaff && ticket.pembuat_id !== user.id)) notFound();
+  const isCreator = ticket.pembuat_id === user.id;
 
   const [
     { data: category, error: categoryError },
@@ -150,7 +153,7 @@ export default async function TicketDetailPage({
     ),
   );
   const { data: relatedProfiles, error: relatedProfilesError } =
-    isStaff && profileIds.length > 0
+    (isStaff || isCreator) && profileIds.length > 0
       ? await supabase.from("users").select("id, nama").in("id", profileIds)
       : { data: [], error: null };
   const namesById = new Map(
@@ -160,9 +163,7 @@ export default async function TicketDetailPage({
   );
 
   const mayViewRemoteIds =
-    isStaff &&
-    (role === "admin" || ticket.it_id === user.id) &&
-    ticket.penanganan === "remote";
+    isStaff && (role === "admin" || ticket.it_id === user.id);
   const { data: remoteCredentials, error: remoteError } = mayViewRemoteIds
     ? await supabase
         .from("remote_credentials")
@@ -327,26 +328,47 @@ export default async function TicketDetailPage({
           )}
           <p className="mt-3 text-xs text-gray-500">
             Hanya IT yang ditugaskan dan admin yang dapat melihat ID. Password
-            tidak ditampilkan.
+            tidak pernah masuk database; password sementara hanya dapat diambil
+            sekali selama 5 menit.
           </p>
+          <RemoteSecretButton ticketId={ticket.id} />
         </section>
       )}
 
-      {isStaff && (
+      {(isStaff || isCreator) && (
         <section className="border-t pt-4">
           <h2 className="mb-2 font-medium">Aksi</h2>
-          {ticket.it_id && (
+          {isStaff && ticket.it_id && (
             <p className="mb-3 text-sm text-gray-600">
               Ditangani oleh: {namesById.get(ticket.it_id) ?? "IT"}
             </p>
           )}
-          <TicketActions
-            ticketId={ticket.id}
-            status={status}
-            assigneeId={ticket.it_id}
-            userId={user.id}
-            role={role}
-          />
+          {isStaff && (
+            <TicketActions
+              ticketId={ticket.id}
+              status={status}
+              assigneeId={ticket.it_id}
+              userId={user.id}
+              role={role}
+            />
+          )}
+          {isCreator && status === "selesai" && (
+            <UserRatingForm ticketId={ticket.id} />
+          )}
+          {status === "ditutup" && ticket.rating != null && (
+            <p className="inline-block rounded border bg-gray-50 p-3 text-sm">
+              Rating pembuat:{" "}
+              <span
+                aria-label={`${ticket.rating} dari 5 bintang`}
+                className="text-lg text-yellow-500"
+              >
+                {"★".repeat(ticket.rating)}
+              </span>
+            </p>
+          )}
+          {isCreator && status === "ditutup" && ticket.rating == null && (
+            <p className="text-sm text-gray-500">Tiket sudah ditutup.</p>
+          )}
         </section>
       )}
 

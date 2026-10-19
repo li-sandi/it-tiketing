@@ -141,7 +141,7 @@ async function loadTicket(ticketId: string) {
   const { data: ticket, error: ticketError } = await admin
     .from("tickets")
     .select(
-      "id, nomor_tiket, prioritas, deskripsi, penanganan, site_id, pembuat_id, category_id, status, tipe",
+      "id, nomor_tiket, prioritas, deskripsi, penanganan, site_id, pembuat_id, pembuat_nama, category_id, status, tipe",
     )
     .eq("id", ticketId)
     .maybeSingle();
@@ -157,11 +157,13 @@ async function loadTicket(ticketId: string) {
     ticket.site_id
       ? admin.from("sites").select("nama").eq("id", ticket.site_id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    admin
-      .from("users")
-      .select("id, nama, telegram_id")
-      .eq("id", ticket.pembuat_id)
-      .maybeSingle(),
+    ticket.pembuat_id
+      ? admin
+          .from("users")
+          .select("id, nama, telegram_id")
+          .eq("id", ticket.pembuat_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   if (categoryError) throw new Error(`Gagal membaca kategori: ${categoryError.message}`);
@@ -227,7 +229,7 @@ export async function notifTiketBaru(ticketId: string) {
   const message = `${emoji} <b>Tiket Baru ${escapeHtml(data.ticket.prioritas)}</b>
 ${escapeHtml(data.ticket.nomor_tiket)} — ${escapeHtml(data.category?.nama ?? "-")}
 Site: ${escapeHtml(data.site?.nama ?? "-")}
-Dari: ${escapeHtml(data.requester?.nama ?? "-")}
+Dari: ${escapeHtml(data.requester?.nama ?? data.ticket.pembuat_nama ?? "-")}
 Penanganan: ${escapeHtml(data.ticket.penanganan)}
 
 ${compactDescription(data.ticket.deskripsi)}
@@ -262,7 +264,7 @@ export async function notifP0Broadcast(ticketId: string) {
   const message = `🚨 <b>INSIDEN P0 BARU</b>
 ${escapeHtml(data.ticket.nomor_tiket)} — ${escapeHtml(data.category?.nama ?? "-")}
 Site: ${escapeHtml(data.site?.nama ?? "-")}
-Dari: ${escapeHtml(data.requester?.nama ?? "-")}
+Dari: ${escapeHtml(data.requester?.nama ?? data.ticket.pembuat_nama ?? "-")}
 
 ${compactDescription(data.ticket.deskripsi)}
 
