@@ -13,7 +13,7 @@ dan Telegram.
   tiket selesai.
 - Prioritas, SLA, notifikasi Telegram, dan auto-close tiket.
 - Lampiran foto serta AnyDesk ID/UV ID yang terhubung dengan nomor aset.
-- Dashboard publik dengan informasi yang aman ditampilkan.
+- Halaman utama publik untuk memulai laporan tiket.
 - Tema terang dan gelap yang dapat dipilih pengguna.
 - Admin Panel di `/admin` untuk mengelola kategori, user, dan jadwal kunjungan
   Sleman.
@@ -78,24 +78,40 @@ npm run build    # production build dan pemeriksaan TypeScript
 npm run start    # jalankan production build
 ```
 
-## Halaman utama
+## Halaman dan akses berdasarkan peran
 
-| Halaman | Keterangan |
-| --- | --- |
-| `/` | Dashboard publik |
-| `/lapor` | Form laporan tiket publik |
-| `/status/[token]` | Status dan rating tiket melalui link privat |
-| `/login` | Login staf |
-| `/dashboard` | Dashboard pengguna |
-| `/tiket` | Tiket aktif lintas site dan riwayat tiket sendiri |
-| `/antrian` | Antrian tiket IT |
-| `/admin` | Ringkasan Admin Panel |
-| `/admin/kategori` | Kelola kategori tiket |
-| `/admin/users` | Kelola peran dan site pengguna |
-| `/admin/jadwal` | Lihat dan generate jadwal kunjungan Sleman |
+`/` adalah halaman publik untuk memulai laporan; `/dashboard` adalah dashboard
+akun yang memerlukan login; `/admin` adalah panel pengelolaan khusus admin.
+Jadi dashboard akun dan Admin Panel bukan halaman yang sama: admin dapat
+mengakses keduanya, sedangkan user/IT tidak dapat membuka Admin Panel.
 
-Admin Panel hanya dapat diakses oleh akun dengan peran `admin`. Masing-masing
-fitur admin tersedia dari navigasi bersama di bagian atas halaman.
+| Route | Siapa yang dapat membuka | Kegunaan |
+| --- | --- | --- |
+| `/` | Semua orang | Halaman awal layanan dan tautan untuk melapor |
+| `/lapor` | Semua orang | Membuat tiket publik tanpa login |
+| `/status/[token]` | Pemegang token tiket | Melihat status dan riwayat tiket publik, memberi rating saat selesai |
+| `/login` | Semua orang | Login akun user, IT, atau admin |
+| `/dashboard` | User, IT, admin yang login | Dashboard akun; tautan tiket, pembuatan tiket, Telegram, dan antrian untuk staf |
+| `/tiket` | Semua akun yang login | Ringkasan tiket aktif lintas site dengan filter; riwayat tiket selesai milik sendiri |
+| `/tiket/baru` | Semua akun yang login | Membuat tiket atas nama akun |
+| `/tiket/[id]` | Pembuat tiket tersebut, IT, atau admin | Detail dan aksi tiket sesuai role |
+| `/antrian` | IT dan admin | Antrian baru dan tiket yang sedang ditangani |
+| `/admin` | Admin saja | Ringkasan dan pintu masuk fitur Admin Panel |
+| `/admin/kategori` | Admin saja | Mengelola kategori tiket |
+| `/admin/users` | Admin saja | Mengelola role dan site user |
+| `/admin/jadwal` | Admin saja | Melihat dan membuat jadwal kunjungan Sleman |
+
+Dashboard akun menampilkan tautan **Admin Panel** hanya untuk admin. Di dalam
+panel, navigasi **Dashboard** kembali ke `/dashboard`; halaman admin tetap
+terkumpul di bawah `/admin` dengan navigasi Kategori, User, dan Jadwal.
+
+### Endpoint API
+
+API tidak dimaksudkan untuk dibuka langsung sebagai halaman web. Endpoint
+`/api/admin/*` memerlukan role admin; endpoint cron memerlukan `CRON_SECRET`;
+endpoint notifikasi tiket internal, Telegram, lampiran, dan pembuatan tiket
+berakun memerlukan sesi atau validasi kepemilikan yang sesuai. Pembuatan tiket
+publik dan API status/rating publik dibatasi validasi form atau token tiket.
 
 ## Database dan deployment
 

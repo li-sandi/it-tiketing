@@ -25,7 +25,7 @@ export default async function DashboardPage() {
   if (profileError) {
     return (
       <main className="p-8">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <h1 className="text-2xl font-semibold">Dashboard Akun</h1>
         <p role="alert" className="mt-4 text-red-700">
           Gagal memuat profil: {profileError.message}
         </p>
@@ -61,6 +61,14 @@ export default async function DashboardPage() {
             className="rounded bg-black px-4 py-2 text-sm text-white"
           >
             Buka Antrian IT
+          </Link>
+        )}
+        {profil?.peran === "admin" && (
+          <Link
+            href="/admin"
+            className="rounded border px-4 py-2 text-sm font-medium hover:bg-gray-50"
+          >
+            Admin Panel
           </Link>
         )}
       </div>
