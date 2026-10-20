@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cekCronSecret } from "@/lib/cron-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { escapeHtml } from "@/lib/telegram";
 import { notifyTicketRecipients } from "@/lib/notifikasi";
@@ -21,15 +22,6 @@ type Candidate = {
   priority: string;
   description: string;
 };
-
-function validateCronSecret(request: Request) {
-  const expected = process.env.CRON_SECRET;
-  if (!expected) throw new Error("CRON_SECRET belum diset.");
-
-  const provided = request.headers.get("x-cron-secret");
-  if (!provided || provided !== expected) return false;
-  return true;
-}
 
 function buildTicketLink(ticketId: string) {
   const base = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -72,11 +64,11 @@ async function findRecipients(
 }
 
 export async function GET(request: Request) {
-  try {
-    if (!validateCronSecret(request)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!cekCronSecret(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  try {
     const admin = createAdminClient();
     const now = Date.now();
 

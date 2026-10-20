@@ -82,6 +82,7 @@ export default function TicketForm({
   const [categoryId, setCategoryId] = useState("");
   const [deskripsi, setDeskripsi] = useState("");
   const [jumlahUser, setJumlahUser] = useState<number | "">("");
+  const [jumlahTask, setJumlahTask] = useState<number | "">("");
   const [nomorAset, setNomorAset] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -99,8 +100,8 @@ export default function TicketForm({
     aturan?.tipe === "persen_site" ||
     aturan?.tipe === "jumlah_user" ||
     kategori?.nama === "Internet lambat" ||
-    kategori?.nama === "Masalah VPN" ||
-    kategori?.nama === "Aktivasi / non-aktivasi VPN";
+    kategori?.nama === "Masalah VPN";
+  const needsTaskCount = aturan?.tipe === "jumlah_task";
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -112,6 +113,16 @@ export default function TicketForm({
 
     if (needsAffectedUsers && (jumlahUser === "" || jumlahUser < 1)) {
       setError("Masukkan jumlah user terdampak (minimal 1).");
+      return;
+    }
+    if (
+      needsTaskCount &&
+      (jumlahTask === "" ||
+        !Number.isSafeInteger(jumlahTask) ||
+        jumlahTask < 1 ||
+        jumlahTask > 100_000)
+    ) {
+      setError("Masukkan jumlah task antara 1 sampai 100.000.");
       return;
     }
 
@@ -143,6 +154,7 @@ export default function TicketForm({
       aturan,
       jumlahUserTerdampak: typeof jumlahUser === "number" ? jumlahUser : undefined,
       jumlahUserSite,
+      jumlahTaskVendor: typeof jumlahTask === "number" ? jumlahTask : undefined,
     });
 
     const supabase = createClient();
@@ -157,6 +169,8 @@ export default function TicketForm({
         prioritas,
         jumlah_user_terdampak:
           typeof jumlahUser === "number" ? jumlahUser : null,
+        jumlah_task:
+          typeof jumlahTask === "number" ? jumlahTask : null,
         nomor_aset: nomorAset.trim() || null,
         penanganan,
       })
@@ -240,7 +254,7 @@ export default function TicketForm({
         warnings?: string[];
       };
 
-      if (!notificationResponse.ok) {
+      if (!notificationResponse.ok || notificationResult.warnings?.length) {
         postCreateWarnings.push(
           notificationResult.warnings?.join("; ") ??
             notificationResult.error ??
@@ -274,6 +288,7 @@ export default function TicketForm({
           onChange={(event) => {
             setCategoryId(event.target.value);
             setJumlahUser("");
+            setJumlahTask("");
             setNomorAset("");
             setFile(null);
             setFileError(null);
@@ -320,6 +335,28 @@ export default function TicketForm({
             value={jumlahUser}
             onChange={(event) =>
               setJumlahUser(
+                event.target.value === "" ? "" : Number(event.target.value),
+              )
+            }
+            required
+            className="w-full rounded border px-3 py-2"
+          />
+        </div>
+      )}
+
+      {needsTaskCount && (
+        <div>
+          <label htmlFor="task-count" className="mb-1 block text-sm font-medium">
+            Berapa jumlah task (akun) yang diaktifkan atau dinonaktifkan?
+          </label>
+          <input
+            id="task-count"
+            type="number"
+            min={1}
+            max={100_000}
+            value={jumlahTask}
+            onChange={(event) =>
+              setJumlahTask(
                 event.target.value === "" ? "" : Number(event.target.value),
               )
             }

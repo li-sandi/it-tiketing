@@ -11,7 +11,9 @@ type NotificationType =
   | "sla_respon_lewat"
   | "sla_resolusi_mendekati"
   | "sla_resolusi_lewat"
-  | "auto_close";
+  | "auto_close"
+  | "kunjungan_sleman"
+  | "kunjungan_sleman_reminder";
 type Recipient = {
   id: string;
   nama: string;
@@ -125,13 +127,13 @@ async function deliver(
   return result;
 }
 
-function buildTicketLink(ticketId: string, label: string) {
+export function buildTicketLink(ticketId: string, label: string) {
   const url = new URL(`/tiket/${encodeURIComponent(ticketId)}`, publicAppUrl());
   const safeUrl = escapeHtml(url.toString());
   return `<a href="${safeUrl}">${label}</a>`;
 }
 
-function compactDescription(description: string) {
+export function compactDescription(description: string) {
   const compact = description.replace(/\s+/g, " ").trim().slice(0, 200);
   return escapeHtml(compact);
 }
@@ -235,7 +237,18 @@ export async function notifTiketBaru(ticketId: string) {
       throw new Error(`Gagal mencari IT penerima tiket: ${siteItsError.message}`);
     }
 
-    const candidates = staffRecipients(siteIts);
+    let candidates = staffRecipients(siteIts);
+    if (!candidates.length) {
+      const { data: allIts, error: allItsError } = await admin
+        .from("users")
+        .select("id, nama, telegram_id")
+        .eq("peran", "it")
+        .not("telegram_id", "is", null);
+      if (allItsError) {
+        throw new Error(`Gagal mencari IT pengganti: ${allItsError.message}`);
+      }
+      candidates = staffRecipients(allIts);
+    }
     const { data: freeStatuses, error: statusError } = candidates.length
       ? await admin
           .from("it_status")

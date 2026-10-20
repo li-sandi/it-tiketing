@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { notifP0Broadcast, notifTiketBaru } from "@/lib/notifikasi";
+import { prosesNotifikasiTiketBaru } from "@/lib/sleman";
 import { hitungPrioritas, parseAturanKenaikan } from "@/lib/prioritas";
 
 function createRateLimiter() {
   return new Ratelimit({
     redis: Redis.fromEnv(),
-    limiter: Ratelimit.slidingWindow(5, "15 m"),
+    limiter: Ratelimit.slidingWindow(20, "15 m"),
     analytics: false,
     prefix: "it-ticketing:public-ticket",
   });
@@ -184,6 +184,7 @@ export async function POST(request: Request) {
   const categoryId = textField(formData, "categoryId");
   const deskripsi = textField(formData, "deskripsi");
   const jumlahUserRaw = textField(formData, "jumlahUser");
+  const jumlahTaskRaw = textField(formData, "jumlahTask");
   const nomorAset = textField(formData, "nomorAset");
   const penanganan = textField(formData, "penanganan");
   const anydeskId = textField(formData, "anydeskId");
@@ -227,6 +228,17 @@ export async function POST(request: Request) {
       jumlahUser > 1_000_000
     ) {
       return jsonError("Jumlah user terdampak tidak valid.", 400);
+    }
+  }
+  let jumlahTask: number | null = null;
+  if (jumlahTaskRaw) {
+    jumlahTask = Number(jumlahTaskRaw);
+    if (
+      !Number.isSafeInteger(jumlahTask) ||
+      jumlahTask < 1 ||
+      jumlahTask > 100_000
+    ) {
+      return jsonError("Jumlah task tidak valid.", 400);
     }
   }
 
@@ -288,11 +300,15 @@ export async function POST(request: Request) {
   const needsAffectedUsers =
     rule?.tipe === "persen_site" ||
     rule?.tipe === "jumlah_user" ||
-    ["Internet lambat", "Masalah VPN", "Aktivasi / non-aktivasi VPN"].includes(
-      category.nama,
-    );
+    ["Internet lambat", "Masalah VPN"].includes(category.nama);
   if (needsAffectedUsers && jumlahUser === null) {
     return jsonError("Masukkan jumlah user terdampak (minimal 1).", 400);
+  }
+  if (rule?.tipe === "jumlah_task" && jumlahTask === null) {
+    return jsonError("Masukkan jumlah task (minimal 1).", 400);
+  }
+  if (rule?.tipe !== "jumlah_task" && jumlahTask !== null) {
+    return jsonError("Jumlah task tidak berlaku untuk kategori ini.", 400);
   }
 
   let imageFormat: (typeof IMAGE_FORMATS)[number] | null = null;
@@ -316,6 +332,7 @@ export async function POST(request: Request) {
     aturan: rule,
     jumlahUserTerdampak: jumlahUser ?? undefined,
     jumlahUserSite: site.jumlah_user,
+    jumlahTaskVendor: jumlahTask ?? undefined,
   });
   const accessToken = crypto.randomUUID();
   const { data: ticket, error: insertError } = await admin
@@ -331,6 +348,7 @@ export async function POST(request: Request) {
       deskripsi,
       prioritas,
       jumlah_user_terdampak: jumlahUser,
+      jumlah_task: jumlahTask,
       nomor_aset: nomorAset || null,
       penanganan,
     })
@@ -411,19 +429,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const notificationResults = await Promise.allSettled([
-    notifTiketBaru(ticket.id),
-    notifP0Broadcast(ticket.id),
-  ]);
-  const warnings = notificationResults.flatMap((result) =>
-    result.status === "rejected"
-      ? [
-          result.reason instanceof Error
-            ? result.reason.message
-            : "Notifikasi Telegram gagal dikirim.",
-        ]
-      : [],
-  );
+  const { warnings, kunjungan } = await prosesNotifikasiTiketBaru(ticket.id);
   if (warnings.length) {
     console.error("Notifikasi tiket publik gagal:", warnings.join("; "));
   }
@@ -434,6 +440,7 @@ export async function POST(request: Request) {
       id: ticket.id,
       nomorTiket: ticket.nomor_tiket,
       token: accessToken,
+      kunjungan,
       warnings,
     },
     { status: 201, headers: { "Cache-Control": "no-store" } },

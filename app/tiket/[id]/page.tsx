@@ -82,7 +82,7 @@ export default async function TicketDetailPage({
   const { data: ticket, error: ticketError } = await supabase
     .from("tickets")
     .select(
-      "id, nomor_tiket, pembuat_id, site_id, category_id, deskripsi, prioritas, jumlah_user_terdampak, nomor_aset, penanganan, status, it_id, dibuat_pada, diproses_pada, selesai_pada, ditutup_pada, rating, sla_respon_batas, sla_resolusi_batas",
+      "id, nomor_tiket, pembuat_id, site_id, category_id, deskripsi, prioritas, jumlah_user_terdampak, jumlah_task, kunjungan_pada, nomor_aset, penanganan, status, it_id, dibuat_pada, diproses_pada, selesai_pada, ditutup_pada, poin_kesulitan, catatan_solusi, rating, sla_respon_batas, sla_resolusi_batas",
     )
     .eq("id", id)
     .maybeSingle();
@@ -224,6 +224,23 @@ export default async function TicketDetailPage({
             <p>{ticket.jumlah_user_terdampak}</p>
           </div>
         )}
+        {ticket.jumlah_task != null && (
+          <div>
+            <p className="text-sm text-gray-500">Jumlah task</p>
+            <p>{ticket.jumlah_task}</p>
+          </div>
+        )}
+        {ticket.kunjungan_pada && (
+          <div>
+            <p className="text-sm text-gray-500">Tanggal kunjungan</p>
+            <p>
+              {new Date(`${ticket.kunjungan_pada}T00:00:00.000Z`).toLocaleDateString(
+                "id-ID",
+                { dateStyle: "long", timeZone: "UTC" },
+              )}
+            </p>
+          </div>
+        )}
         {ticket.nomor_aset && (
           <div>
             <p className="text-sm text-gray-500">Nomor aset</p>
@@ -242,6 +259,20 @@ export default async function TicketDetailPage({
         <h2 className="mb-2 font-medium">Deskripsi</h2>
         <p className="whitespace-pre-wrap">{ticket.deskripsi}</p>
       </section>
+
+      {(ticket.poin_kesulitan != null || ticket.catatan_solusi) && (
+        <section className="space-y-2 rounded border p-5">
+          <h2 className="font-medium">Penyelesaian</h2>
+          {ticket.poin_kesulitan != null && (
+            <p>Poin kesulitan: {ticket.poin_kesulitan} dari 5</p>
+          )}
+          {ticket.catatan_solusi && (
+            <p className="whitespace-pre-wrap text-sm">
+              {ticket.catatan_solusi}
+            </p>
+          )}
+        </section>
+      )}
 
       {(attachmentsError || attachmentsWithUrl.length > 0) && (
         <section className="rounded border p-5">

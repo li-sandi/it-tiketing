@@ -34,6 +34,7 @@ export default function PublicTicketForm({
   const [categoryId, setCategoryId] = useState("");
   const [deskripsi, setDeskripsi] = useState("");
   const [jumlahUser, setJumlahUser] = useState("");
+  const [jumlahTask, setJumlahTask] = useState("");
   const [nomorAset, setNomorAset] = useState("");
   const [penanganan, setPenanganan] = useState<"onsite" | "remote">("onsite");
   const [anydeskId, setAnydeskId] = useState("");
@@ -47,9 +48,8 @@ export default function PublicTicketForm({
   const needsAffectedUsers =
     rule?.tipe === "persen_site" ||
     rule?.tipe === "jumlah_user" ||
-    ["Internet lambat", "Masalah VPN", "Aktivasi / non-aktivasi VPN"].includes(
-      category?.nama ?? "",
-    );
+    ["Internet lambat", "Masalah VPN"].includes(category?.nama ?? "");
+  const needsTaskCount = rule?.tipe === "jumlah_task";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,6 +59,15 @@ export default function PublicTicketForm({
     if (!siteId) return setError("Pilih site terlebih dahulu.");
     if (needsAffectedUsers && (!jumlahUser || Number(jumlahUser) < 1)) {
       return setError("Masukkan jumlah user terdampak (minimal 1).");
+    }
+    if (
+      needsTaskCount &&
+      (!jumlahTask ||
+        !Number.isSafeInteger(Number(jumlahTask)) ||
+        Number(jumlahTask) < 1 ||
+        Number(jumlahTask) > 100_000)
+    ) {
+      return setError("Masukkan jumlah task antara 1 sampai 100.000.");
     }
     if (category.butuh_aset && !nomorAset.trim()) {
       return setError("Kategori ini mewajibkan nomor aset.");
@@ -82,6 +91,7 @@ export default function PublicTicketForm({
     formData.set("deskripsi", deskripsi);
     formData.set("penanganan", penanganan);
     formData.set("jumlahUser", jumlahUser);
+    formData.set("jumlahTask", jumlahTask);
     formData.set("nomorAset", nomorAset);
     formData.set("anydeskId", anydeskId);
     formData.set("uvId", uvId);
@@ -95,9 +105,19 @@ export default function PublicTicketForm({
       const result = (await response.json()) as {
         error?: string;
         token?: string;
+        warnings?: string[];
+        kunjungan?: { tanggalLabel: string; itNama: string | null } | null;
       };
       if (!response.ok || !result.token) {
         throw new Error(result.error ?? "Gagal membuat tiket.");
+      }
+      if (result.warnings?.length) {
+        console.error("Tiket dibuat dengan peringatan:", result.warnings);
+      }
+      if (result.kunjungan) {
+        console.info(
+          `Tiket diarahkan ke kunjungan ${result.kunjungan.tanggalLabel}.`,
+        );
       }
       try {
         window.localStorage.setItem("public-ticket-access-token", result.token);
@@ -176,6 +196,7 @@ export default function PublicTicketForm({
           onChange={(event) => {
             setCategoryId(event.target.value);
             setJumlahUser("");
+            setJumlahTask("");
             setNomorAset("");
             setFile(null);
             setPenanganan("onsite");
@@ -222,6 +243,27 @@ export default function PublicTicketForm({
             max={1_000_000}
             value={jumlahUser}
             onChange={(event) => setJumlahUser(event.target.value)}
+            required
+            className="w-full rounded border px-3 py-2"
+          />
+        </div>
+      )}
+
+      {needsTaskCount && (
+        <div>
+          <label
+            htmlFor="public-task-count"
+            className="mb-1 block text-sm font-medium"
+          >
+            Berapa jumlah task (akun) yang diaktifkan atau dinonaktifkan?
+          </label>
+          <input
+            id="public-task-count"
+            type="number"
+            min={1}
+            max={100_000}
+            value={jumlahTask}
+            onChange={(event) => setJumlahTask(event.target.value)}
             required
             className="w-full rounded border px-3 py-2"
           />

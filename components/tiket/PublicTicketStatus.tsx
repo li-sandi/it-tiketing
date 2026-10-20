@@ -12,6 +12,8 @@ type TicketStatusData = {
   penanganan: string;
   dibuat_pada: string;
   selesai_pada: string | null;
+  poin_kesulitan: number | null;
+  catatan_solusi: string | null;
   rating: number | null;
   kategori: string | null;
   site: string | null;
@@ -183,6 +185,20 @@ export default function PublicTicketStatus({ token }: { token: string }) {
         <h2 className="mb-2 font-medium">Deskripsi</h2>
         <p className="whitespace-pre-wrap">{tiket.deskripsi}</p>
       </section>
+
+      {(tiket.poin_kesulitan != null || tiket.catatan_solusi) && (
+        <section className="space-y-2 rounded border p-4">
+          <h2 className="font-medium">Penyelesaian</h2>
+          {tiket.poin_kesulitan != null && (
+            <p>Poin kesulitan: {tiket.poin_kesulitan} dari 5</p>
+          )}
+          {tiket.catatan_solusi && (
+            <p className="whitespace-pre-wrap text-sm">
+              {tiket.catatan_solusi}
+            </p>
+          )}
+        </section>
+      )}
 
       {tiket.status === "selesai" && (
         <form

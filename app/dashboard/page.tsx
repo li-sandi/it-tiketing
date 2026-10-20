@@ -50,7 +50,7 @@ export default async function DashboardPage() {
       </div>
       <div className="mt-6 flex gap-3">
         <Link href="/tiket" className="rounded border px-4 py-2">
-          Tiket Saya
+          Tiket Aktif
         </Link>
         <Link href="/tiket/baru" className="rounded bg-black px-4 py-2 text-white">
           Buat Tiket

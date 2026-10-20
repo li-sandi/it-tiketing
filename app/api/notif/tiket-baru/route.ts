@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { notifP0Broadcast, notifTiketBaru } from "@/lib/notifikasi";
+import { prosesNotifikasiTiketBaru } from "@/lib/sleman";
 import { createClient } from "@/lib/supabase/server";
 
 const uuidPattern =
@@ -67,25 +67,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const results = await Promise.allSettled([
-    notifTiketBaru(ticket.id),
-    notifP0Broadcast(ticket.id),
-  ]);
-  const warnings = results.flatMap((result) =>
-    result.status === "rejected"
-      ? [
-          result.reason instanceof Error
-            ? result.reason.message
-            : "Pengiriman notifikasi gagal.",
-        ]
-      : [],
-  );
+  const { warnings, kunjungan } = await prosesNotifikasiTiketBaru(ticket.id);
 
   if (warnings.length) {
     return NextResponse.json(
-      { ok: false, warnings },
+      { ok: false, kunjungan, warnings },
       { status: 207 },
     );
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, kunjungan });
 }

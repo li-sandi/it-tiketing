@@ -18,6 +18,8 @@ Jalankan berurutan di Supabase SQL Editor (klik "New query", paste, Run):
 14. `migrations/0014_remove_kota_baru_site.sql` — hapus site Kota Baru dan kosongkan relasi site user/tiket/jadwal tanpa menghapus record terkait
 15. `migrations/0015_replace_sleman_schedule.sql` — fungsi atomik untuk mengganti jadwal kunjungan Sleman dalam satu periode
 16. `migrations/0016_route_sleman_tickets.sql` — route tiket baru ke petugas kunjungan Sleman dan tetapkan SLA akhir hari untuk P1
+17. `migrations/0017_vpn_status_sleman_reminders.sql` — jumlah task VPN, status IT otomatis, routing kunjungan atomik, dan tipe notifikasi pengingat
+18. `migrations/0018_active_ticket_board_and_solution.sql` — validasi poin kesulitan dan catatan solusi saat tiket ditandai selesai
 
 Kalau pakai Supabase CLI:
 
@@ -25,7 +27,7 @@ Kalau pakai Supabase CLI:
 
 ## Urutan penting
 
-File dijalankan **berurutan**. 0001 harus selesai sebelum 0002 (karena insert butuh tabel), 0003 sesudah tabel tickets dibuat, 0004 setelah semua tabel tersedia, 0005 setelah kebijakan akses dasar, 0006 setelah tabel tiket tersedia, 0007 setelah notifikasi dan dedup Telegram siap digunakan, 0008 setelah tabel tiket serta `ticket_events` tersedia, 0009 setelah tabel `attachments` serta kebijakan akses dasar tersedia, 0010 setelah bucket/policy upload dibuat, 0011 setelah tabel tiket serta kebijakan dasar tersedia, 0012 setelah tabel tiket tersedia, 0013 setelah kolom token publik ditambahkan, 0014 setelah tabel users/tickets/jadwal dibuat, 0015 setelah tabel `it_schedule` serta peran `service_role` tersedia, dan 0016 setelah jadwal Sleman dan `ticket_events` tersedia.
+File dijalankan **berurutan**. 0001 harus selesai sebelum 0002 (karena insert butuh tabel), 0003 sesudah tabel tickets dibuat, 0004 setelah semua tabel tersedia, 0005 setelah kebijakan akses dasar, 0006 setelah tabel tiket tersedia, 0007 setelah notifikasi dan dedup Telegram siap digunakan, 0008 setelah tabel tiket serta `ticket_events` tersedia, 0009 setelah tabel `attachments` serta kebijakan akses dasar tersedia, 0010 setelah bucket/policy upload dibuat, 0011 setelah tabel tiket serta kebijakan dasar tersedia, 0012 setelah tabel tiket tersedia, 0013 setelah kolom token publik ditambahkan, 0014 setelah tabel users/tickets/jadwal dibuat, 0015 setelah tabel `it_schedule` serta peran `service_role` tersedia, 0016 setelah jadwal Sleman dan `ticket_events` tersedia, 0017 setelah semua tabel tiket, user, jadwal, serta notifikasi tersedia, dan 0018 setelah tabel tickets memiliki kolom penyelesaian.
 
 Migrasi `0014` menghapus baris site Kota Baru. User, tiket, dan jadwal yang
 merujuk ke site tersebut tetap disimpan dengan `site_id` bernilai `NULL`.
@@ -40,6 +42,31 @@ duplikat atau petugas yang sudah bukan IT, pembuatan tiket gagal agar tidak
 terjadi routing yang salah. Untuk notifikasi Telegram langsung, petugas harus
 sudah menghubungkan bot. Tiket Sleman di luar hari kunjungan dikirim ke IT yang
 tersedia tanpa auto-assignment.
+
+Migrasi `0017` mengganti auto-assignment hari-kunjungan dari `0016` dengan alur
+berdasarkan prioritas: tiket onsite P0/P1 hanya dikirim ke petugas jika
+kunjungan berlangsung hari itu, sedangkan P2/P3 diubah ke status
+`dijadwalkan_kunjungan` dan ditugaskan ke kunjungan terdekat, yang tanggalnya
+disimpan di `kunjungan_pada` agar pengingat hanya memuat tiket untuk tanggal
+tersebut. Migrasi ini memigrasikan tiket P2/P3 lama yang sudah di-assign oleh
+`0016`. P1 pada hari kunjungan tetap memiliki batas resolusi akhir hari WIB.
+Migrasi ini juga menambahkan `jumlah_task`; aturan kategori jumlah-task
+menggunakan operator dan threshold kategori, sehingga konfigurasi seed `>` 10
+memberi P1 untuk 10 task dan P0 untuk 11 atau lebih. Database memvalidasi
+prioritas task agar tidak bergantung hanya pada nilai dari browser.
+
+Trigger status IT menetapkan `sibuk` selama ada tiket berstatus `diproses`, dan
+`free` setelah tiket tidak lagi dalam status itu; status manual `off` dan
+`kunjungan` tidak ditimpa. Migrasi melakukan backfill status untuk semua user
+berperan IT. Fungsi `schedule_sleman_ticket` melakukan assignment dan pencatatan
+event dalam satu transaksi.
+
+Migrasi `0018` membatasi poin kesulitan pada skala 1–5 dan catatan solusi pada
+5–5.000 karakter. Saat IT mengubah status tiket menjadi `selesai`, keduanya
+wajib diberikan dan diverifikasi oleh trigger database. Daftar `/tiket`
+menampilkan ringkasan aman seluruh tiket aktif untuk pengguna yang login,
+dengan filter site serta urutan P0 sampai P3. Detail dan deskripsi tetap hanya
+tersedia bagi pembuat tiket dan staf yang berwenang.
 
 ## Telegram (polling lokal)
 
@@ -56,13 +83,13 @@ Setelah menambahkan environment, restart `npm run dev`. Jalankan migration 0005 
 
 Jalankan migration 0006 sebelum mengaktifkan notifikasi tiket. Notifikasi tiket baru dipicu dari endpoint yang memverifikasi sesi pembuat tiket dan hanya menerima tiket berstatus baru yang dibuat dalam lima menit terakhir. Pengiriman disimpan per tiket/jenis/penerima untuk mencegah notifikasi ganda; kegagalan pengiriman dapat dicoba lagi.
 
-Setelah itu, jalankan 0007 dan 0008. Migration 0007 menambahkan tipe notifikasi SLA dan auto-close; 0008 menambahkan fungsi untuk menutup tiket dan mencatat event status dalam satu transaksi. Endpoint cron `/api/cron/sla-check` dan `/api/cron/auto-close` memerlukan header `x-cron-secret` yang sama dengan variabel `CRON_SECRET` di `.env.local`. Warning dikirim sekali per tiket, tipe, dan penerima; ambangnya P0 2 menit, P1 5 menit, dan P2/P3 15 menit. Tiket berstatus selesai otomatis ditutup setelah 24 jam.
+Setelah itu, jalankan 0007 dan 0008. Migration 0007 menambahkan tipe notifikasi SLA dan auto-close; 0008 menambahkan fungsi untuk menutup tiket dan mencatat event status dalam satu transaksi. Endpoint cron `/api/cron/sla-check` dan `/api/cron/auto-close` memerlukan header `x-cron-secret` atau authorization bearer dengan nilai `CRON_SECRET`. Warning dikirim sekali per tiket, tipe, dan penerima; ambangnya P0 2 menit, P1 5 menit, dan P2/P3 15 menit. Tiket berstatus selesai otomatis ditutup setelah 24 jam.
 
 Jalankan migration 0009 dan 0010 untuk bucket privat `ticket-attachments` (maksimal 5 MB per file; JPEG, PNG, WebP, dan GIF). Upload dilakukan melalui endpoint server terautentikasi yang memverifikasi pemilik tiket serta signature konten file; user hanya dapat membaca lampiran tiket miliknya, sedangkan IT/admin dapat membaca semua lampiran melalui URL bertanda tangan yang berlaku satu jam.
 
 Migration 0011 menambahkan fungsi atomik bagi pembuat untuk menutup tiket berstatus selesai sambil menyimpan rating 1–5 dan event status. Aksi IT hanya ditampilkan kepada akun IT/admin, dan pembuat dapat melihat nama staf yang tercatat pada riwayat tiketnya.
 
-Migration 0012 memungkinkan pembuat tiket publik tanpa akun dengan token akses acak. Formulir `/lapor` membuat tiket melalui `/api/tiket/publik`, dan status tiket dibaca melalui endpoint token `/api/tiket/publik/[token]`. Tabel tiket tetap tidak dapat dibaca langsung oleh role `anon`; jangan membagikan token status karena token tersebut memberi akses baca ke detail tiket. Endpoint publik memvalidasi signature gambar maksimal 5 MB. Pencarian ID aset hanya mengembalikan ID milik tiket yang dapat diakses oleh pembuat yang login atau token tiket publik tersimpan di browser. Tetap terapkan CAPTCHA/rate limiting di edge sebelum membuka formulir ke internet secara luas.
+Migration 0012 memungkinkan pembuat tiket publik tanpa akun dengan token akses acak. Formulir `/lapor` membuat tiket melalui `/api/tiket/publik`, dan status tiket dibaca melalui endpoint token `/api/tiket/publik/[token]`. Tabel tiket tetap tidak dapat dibaca langsung oleh role `anon`; jangan membagikan token status karena token tersebut memberi akses baca ke detail tiket. Endpoint publik memvalidasi signature gambar maksimal 5 MB dan membatasi pembuatan tiket hingga 20 permintaan per IP dalam 15 menit menggunakan Upstash Redis. Pencarian ID aset hanya mengembalikan ID milik tiket yang dapat diakses oleh pembuat yang login atau token tiket publik tersimpan di browser.
 
 Migration 0013 menambahkan fungsi service-role-only untuk menutup tiket publik berstatus selesai melalui token akses, menyimpan rating 1–5, dan mencatat event dalam satu transaksi. Form IT tidak lagi menampilkan transisi `selesai` ke `ditutup`; pembuat berakun menutup lewat rating terautentikasi dan pelapor publik melalui halaman `/status/[token]`.
 
@@ -77,4 +104,4 @@ Kalau mau reset total:
     drop schema public cascade;
     create schema public;
 
-Lalu jalankan keenam belas file migration lagi dari awal sesuai urutan di atas.
+Lalu jalankan ketujuh belas file migration lagi dari awal sesuai urutan di atas.

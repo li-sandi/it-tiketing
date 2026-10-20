@@ -137,6 +137,7 @@ export async function claimTicket(ticketId: string): Promise<ActionResult> {
 export async function changeTicketStatus(
   ticketId: string,
   nextStatus: TicketStatus,
+  completion?: { poinKesulitan: number; catatanSolusi: string },
 ): Promise<ActionResult> {
   if (!uuidPattern.test(ticketId)) return { error: "ID tiket tidak valid." };
   if (
@@ -174,6 +175,29 @@ export async function changeTicketStatus(
       error: `Perubahan status dari ${currentStatus} ke ${nextStatus} tidak diizinkan.`,
     };
   }
+  if (nextStatus === "selesai") {
+    if (!completion) {
+      return {
+        error: "Poin kesulitan dan catatan solusi wajib diisi untuk menyelesaikan tiket.",
+      };
+    }
+    if (typeof completion.catatanSolusi !== "string") {
+      return { error: "Catatan solusi harus berupa teks yang valid." };
+    }
+    if (
+      !Number.isInteger(completion.poinKesulitan) ||
+      completion.poinKesulitan < 1 ||
+      completion.poinKesulitan > 5
+    ) {
+      return { error: "Poin kesulitan harus dipilih dari 1 sampai 5." };
+    }
+    const catatanSolusi = completion.catatanSolusi.trim();
+    if (catatanSolusi.length < 5 || catatanSolusi.length > 5000) {
+      return {
+        error: "Catatan solusi harus berisi 5 sampai 5.000 karakter.",
+      };
+    }
+  }
   if (context.role !== "admin" && ticket.it_id !== context.userId) {
     return { error: "Hanya IT yang mengambil tiket ini yang dapat mengubah status." };
   }
@@ -184,12 +208,21 @@ export async function changeTicketStatus(
     diproses_pada?: string;
     selesai_pada?: string | null;
     ditutup_pada?: string | null;
+    poin_kesulitan?: number;
+    catatan_solusi?: string;
   } = { status: nextStatus };
 
   if (nextStatus === "diproses" && !ticket.diproses_pada) {
     updates.diproses_pada = now;
   }
-  if (nextStatus === "selesai") updates.selesai_pada = now;
+  if (nextStatus === "selesai") {
+    if (!completion) {
+      return { error: "Data penyelesaian tiket tidak tersedia." };
+    }
+    updates.selesai_pada = now;
+    updates.poin_kesulitan = completion.poinKesulitan;
+    updates.catatan_solusi = completion.catatanSolusi.trim();
+  }
   if (currentStatus === "selesai" && nextStatus !== "ditutup") {
     updates.selesai_pada = null;
   }

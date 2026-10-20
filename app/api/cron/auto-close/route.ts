@@ -1,23 +1,16 @@
 import { NextResponse } from "next/server";
+import { cekCronSecret } from "@/lib/cron-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { notifTiketDitutupOtomatis } from "@/lib/notifikasi";
 
 const AUTO_CLOSE_AFTER_MS = 24 * 60 * 60 * 1000;
 
-function validateCronSecret(request: Request) {
-  const expected = process.env.CRON_SECRET;
-  if (!expected) throw new Error("CRON_SECRET belum diset.");
-
-  const provided = request.headers.get("x-cron-secret");
-  return Boolean(provided && provided === expected);
-}
-
 export async function GET(request: Request) {
-  try {
-    if (!validateCronSecret(request)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!cekCronSecret(request)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  try {
     const admin = createAdminClient();
     const now = Date.now();
     const cutoff = new Date(now - AUTO_CLOSE_AFTER_MS).toISOString();

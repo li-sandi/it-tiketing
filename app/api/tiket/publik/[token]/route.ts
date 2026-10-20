@@ -23,7 +23,7 @@ export async function GET(
   const { data: ticket, error: ticketError } = await admin
     .from("tickets")
     .select(
-      "id, nomor_tiket, status, prioritas, deskripsi, penanganan, site_id, category_id, it_id, dibuat_pada, selesai_pada, rating",
+      "id, nomor_tiket, status, prioritas, deskripsi, penanganan, site_id, category_id, it_id, dibuat_pada, selesai_pada, poin_kesulitan, catatan_solusi, rating",
     )
     .eq("akses_token", token)
     .maybeSingle();
@@ -126,6 +126,8 @@ export async function GET(
         penanganan: ticket.penanganan,
         dibuat_pada: ticket.dibuat_pada,
         selesai_pada: ticket.selesai_pada,
+        poin_kesulitan: ticket.poin_kesulitan,
+        catatan_solusi: ticket.catatan_solusi,
         rating: ticket.rating,
         kategori: category?.nama ?? null,
         site: site?.nama ?? null,
