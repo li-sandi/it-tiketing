@@ -144,6 +144,15 @@ export async function POST(request: Request) {
         1,
         Math.ceil((reset - Date.now()) / 1000),
       );
+      console.warn(
+        "Permintaan tiket publik ditolak oleh rate limit:",
+        JSON.stringify({
+          event: "public_ticket_rate_limited",
+          limit,
+          remaining,
+          retryAfterSeconds: secondsRemaining,
+        }),
+      );
       return NextResponse.json(
         {
           error: `Terlalu banyak permintaan. Coba lagi dalam ${Math.ceil(secondsRemaining / 60)} menit.`,

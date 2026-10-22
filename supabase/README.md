@@ -20,6 +20,7 @@ Jalankan berurutan di Supabase SQL Editor (klik "New query", paste, Run):
 16. `migrations/0016_route_sleman_tickets.sql` — route tiket baru ke petugas kunjungan Sleman dan tetapkan SLA akhir hari untuk P1
 17. `migrations/0017_vpn_status_sleman_reminders.sql` — jumlah task VPN, status IT otomatis, routing kunjungan atomik, dan tipe notifikasi pengingat
 18. `migrations/0018_active_ticket_board_and_solution.sql` — validasi poin kesulitan dan catatan solusi saat tiket ditandai selesai
+19. `migrations/0019_restrict_ticket_event_reads.sql` — batasi pembacaan timeline tiket ke pembuat tiket dan staf IT/admin
 
 Kalau pakai Supabase CLI:
 
@@ -27,7 +28,7 @@ Kalau pakai Supabase CLI:
 
 ## Urutan penting
 
-File dijalankan **berurutan**. 0001 harus selesai sebelum 0002 (karena insert butuh tabel), 0003 sesudah tabel tickets dibuat, 0004 setelah semua tabel tersedia, 0005 setelah kebijakan akses dasar, 0006 setelah tabel tiket tersedia, 0007 setelah notifikasi dan dedup Telegram siap digunakan, 0008 setelah tabel tiket serta `ticket_events` tersedia, 0009 setelah tabel `attachments` serta kebijakan akses dasar tersedia, 0010 setelah bucket/policy upload dibuat, 0011 setelah tabel tiket serta kebijakan dasar tersedia, 0012 setelah tabel tiket tersedia, 0013 setelah kolom token publik ditambahkan, 0014 setelah tabel users/tickets/jadwal dibuat, 0015 setelah tabel `it_schedule` serta peran `service_role` tersedia, 0016 setelah jadwal Sleman dan `ticket_events` tersedia, 0017 setelah semua tabel tiket, user, jadwal, serta notifikasi tersedia, dan 0018 setelah tabel tickets memiliki kolom penyelesaian.
+File dijalankan **berurutan**. 0001 harus selesai sebelum 0002 (karena insert butuh tabel), 0003 sesudah tabel tickets dibuat, 0004 setelah semua tabel tersedia, 0005 setelah kebijakan akses dasar, 0006 setelah tabel tiket tersedia, 0007 setelah notifikasi dan dedup Telegram siap digunakan, 0008 setelah tabel tiket serta `ticket_events` tersedia, 0009 setelah tabel `attachments` serta kebijakan akses dasar tersedia, 0010 setelah bucket/policy upload dibuat, 0011 setelah tabel tiket serta kebijakan dasar tersedia, 0012 setelah tabel tiket tersedia, 0013 setelah kolom token publik ditambahkan, 0014 setelah tabel users/tickets/jadwal dibuat, 0015 setelah tabel `it_schedule` serta peran `service_role` tersedia, 0016 setelah jadwal Sleman dan `ticket_events` tersedia, 0017 setelah semua tabel tiket, user, jadwal, serta notifikasi tersedia, 0018 setelah tabel tickets memiliki kolom penyelesaian, dan 0019 setelah policy `ticket_events` dibuat pada 0004.
 
 Migrasi `0014` menghapus baris site Kota Baru. User, tiket, dan jadwal yang
 merujuk ke site tersebut tetap disimpan dengan `site_id` bernilai `NULL`.
@@ -67,6 +68,15 @@ wajib diberikan dan diverifikasi oleh trigger database. Daftar `/tiket`
 menampilkan ringkasan aman seluruh tiket aktif untuk pengguna yang login,
 dengan filter site serta urutan P0 sampai P3. Detail dan deskripsi tetap hanya
 tersedia bagi pembuat tiket dan staf yang berwenang.
+
+Migrasi `0019` mengganti policy baca `ticket_events` agar setiap baris timeline
+secara eksplisit hanya dapat dibaca oleh pembuat tiket tersebut atau role IT dan
+admin. Jangan mengedit migrasi 0004 yang mungkin sudah diterapkan; jalankan
+migrasi 0019 sebagai tambahan.
+
+Untuk UAT, deploy lalu generate jadwal Sleman dari `/admin/jadwal` dan pastikan
+daftar jadwal mendatang terisi. Routing tiket onsite Sleman memerlukan jadwal
+aktif untuk memilih petugas.
 
 ## Telegram (polling lokal)
 

@@ -128,12 +128,36 @@ publik dan API status/rating publik dibatasi validasi form atau token tiket.
   pengingat.
 - Terapkan migrasi `0018_active_ticket_board_and_solution.sql` untuk validasi
   poin kesulitan dan catatan solusi saat tiket ditandai selesai.
+- Terapkan migrasi `0019_restrict_ticket_event_reads.sql` untuk membatasi
+  riwayat tiket ke pembuatnya serta staf IT/admin.
 - Deployment Vercel memerlukan environment variables yang sama dengan
   `.env.local`. Atur `NEXT_PUBLIC_APP_URL` ke domain produksi.
 - Endpoint cron dilindungi oleh header `x-cron-secret` atau authorization
   bearer token. `vercel.json` menjadwalkan pengingat kunjungan Sleman dan
-  auto-close harian; gunakan scheduler eksternal tiap 5 menit untuk
-  `/api/cron/sla-check`.
+  auto-close harian.
+
+### Scheduler SLA tiap 5 menit
+
+Workflow GitHub Actions `.github/workflows/sla-check.yml` memanggil
+`/api/cron/sla-check` dengan interval lima menit. Atur di GitHub repository
+**Settings → Secrets and variables → Actions**:
+
+- Variable `CRON_BASE_URL`: origin production HTTPS, tanpa slash di akhir
+  (contoh `https://aplikasi.example.com`).
+- Secret `CRON_SECRET`: nilai yang sama dengan secret deployment.
+
+Workflow juga dapat dijalankan manual dari tab **Actions**. Jadwal GitHub
+Actions dapat terlambat ketika antrean sibuk; selama UAT, pantau eksekusi
+workflow dan response HTTP. Jika pemanggilan harus lebih presisi, gunakan
+cron-job.org dengan URL `/api/cron/sla-check` dan header `x-cron-secret`.
+
+Sebelum UAT routing Sleman, admin harus membuka `/admin/jadwal`, generate jadwal
+8 minggu, lalu memastikan daftar kunjungan muncul. Tanpa jadwal aktif, routing
+tiket onsite Sleman tidak dapat menentukan petugas kunjungan.
+
+Rate limiter form publik menetapkan 20 tiket per IP per 15 menit. Request yang
+ditolak dicatat sebagai event `public_ticket_rate_limited` tanpa menyimpan IP,
+agar beban shared-IP dapat dievaluasi selama UAT.
 
 Lihat [supabase/README.md](./supabase/README.md) untuk urutan migrasi, setup
 Telegram, lampiran, rating, dan catatan database lainnya.

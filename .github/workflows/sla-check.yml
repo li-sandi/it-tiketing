@@ -1,0 +1,34 @@
+name: SLA check
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  sla-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call production SLA endpoint
+        env:
+          CRON_BASE_URL: ${{ vars.CRON_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$CRON_BASE_URL" =~ ^https://([A-Za-z0-9-]+\.)+[A-Za-z0-9-]+$ ]]; then
+            echo "CRON_BASE_URL must be an HTTPS origin without a trailing slash."
+            exit 1
+          fi
+          if [[ -z "$CRON_SECRET" ]]; then
+            echo "Repository secret CRON_SECRET is not configured."
+            exit 1
+          fi
+
+          curl --fail-with-body --silent --show-error --max-time 150 \
+            --header "x-cron-secret: ${CRON_SECRET}" \
+            "${CRON_BASE_URL}/api/cron/sla-check"

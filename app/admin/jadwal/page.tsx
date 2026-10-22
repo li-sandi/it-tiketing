@@ -66,6 +66,7 @@ export default async function AdminJadwalPage() {
       <h1 className="mb-2 text-2xl font-bold">Jadwal Kunjungan Sleman</h1>
       <p className="mb-6 text-sm text-gray-600">
         Jadwal Selasa dan Kamis dibuat bergantian per minggu untuk 8 minggu.
+        Routing tiket onsite Sleman bergantung pada jadwal aktif di bawah ini.
       </p>
       <GenerateJadwalClient />
 
@@ -102,8 +103,8 @@ export default async function AdminJadwalPage() {
                     colSpan={3}
                     className="px-4 py-8 text-center text-gray-600"
                   >
-                    Belum ada jadwal kunjungan mendatang. Gunakan tombol
-                    generate untuk membuat jadwal.
+                    Belum ada jadwal kunjungan mendatang. Routing otomatis
+                    Sleman belum siap sampai admin membuat jadwal di atas.
                   </td>
                 </tr>
               )}
