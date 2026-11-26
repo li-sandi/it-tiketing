@@ -55,30 +55,34 @@ export default function UserTable({
   }
 
   return (
-    <div>
+    <div className="space-y-4">
       {error && (
-        <p role="alert" className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
           {error}
         </p>
       )}
-      <div className="overflow-x-auto rounded border bg-white">
+      <div className="overflow-x-auto rounded-xl border bg-[var(--surface)] shadow-xs">
         <table className="w-full whitespace-nowrap text-left text-sm">
-          <thead className="border-b bg-gray-100">
+          <thead className="border-b bg-slate-50 text-xs uppercase text-[var(--muted)]">
             <tr>
-              <th className="px-4 py-3">Nama / Email</th>
-              <th className="px-4 py-3">Peran</th>
-              <th className="px-4 py-3">Site</th>
+              <th className="px-4 py-3 font-medium">Nama &amp; Email</th>
+              <th className="px-4 py-3 font-medium">Peran</th>
+              <th className="px-4 py-3 font-medium">Site</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {users.map((user) => (
               <tr
                 key={user.id}
-                className={loadingId === user.id ? "opacity-50" : ""}
+                className={
+                  loadingId === user.id
+                    ? "opacity-50"
+                    : "hover:bg-[var(--surface-muted)]"
+                }
               >
                 <td className="px-4 py-3">
-                  <div className="font-medium">{user.nama}</div>
-                  <div className="text-xs text-gray-500">{user.email}</div>
+                  <div className="font-medium text-[var(--foreground)]">{user.nama}</div>
+                  <div className="text-xs text-[var(--muted)]">{user.email}</div>
                 </td>
                 <td className="px-4 py-3">
                   <select
@@ -88,7 +92,7 @@ export default function UserTable({
                     onChange={(event) =>
                       void updateUser(user.id, "peran", event.target.value)
                     }
-                    className="rounded border bg-transparent px-2 py-1 text-sm"
+                    className="rounded-lg border px-2.5 py-1 text-sm"
                   >
                     <option value="user">User</option>
                     <option value="it">IT</option>
@@ -104,7 +108,7 @@ export default function UserTable({
                     onChange={(event) =>
                       void updateUser(user.id, "site_id", event.target.value)
                     }
-                    className="rounded border bg-transparent px-2 py-1 text-sm"
+                    className="rounded-lg border px-2.5 py-1 text-sm"
                   >
                     <option value="">Tidak ada site</option>
                     {sites.map((site) => (
@@ -118,7 +122,7 @@ export default function UserTable({
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-gray-600">
+                <td colSpan={3} className="px-4 py-8 text-center text-[var(--muted)]">
                   Belum ada user.
                 </td>
               </tr>

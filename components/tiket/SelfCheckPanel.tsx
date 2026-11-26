@@ -65,14 +65,14 @@ export default function SelfCheckPanel({
 
   if (resolved) {
     return (
-      <div className="rounded border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-        <p className="font-medium">
-          Bagus! Masalah berhasil diselesaikan secara mandiri.
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+        <p className="font-semibold">
+          Bagus, masalah berhasil diselesaikan secara mandiri.
         </p>
         <button
           type="button"
           onClick={() => setResolved(false)}
-          className="mt-2 text-xs underline"
+          className="mt-2 text-xs font-medium underline"
         >
           Masih butuh bantuan? Lanjutkan buat tiket
         </button>
@@ -87,21 +87,21 @@ export default function SelfCheckPanel({
   return (
     <aside
       aria-label="Cek Mandiri Sebelum Membuat Tiket"
-      className="space-y-3 rounded border border-blue-200 bg-blue-50 p-4 text-sm"
+      className="space-y-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm shadow-xs"
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="font-semibold text-blue-800">
-            Cek Mandiri — Solusi Cepat dari Wiki IT
+          <h3 className="font-semibold text-blue-900">
+            Cek Mandiri: Solusi Cepat dari Wiki IT
           </h3>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-[var(--secondary)]">
             Coba langkah berikut sebelum mengirim tiket:
           </p>
         </div>
       </div>
 
       {aiSummary && (
-        <div className="rounded border bg-white p-3 text-xs whitespace-pre-wrap">
+        <div className="rounded-lg border bg-[var(--surface)] p-3 text-xs whitespace-pre-wrap text-[var(--foreground)]">
           {aiSummary}
         </div>
       )}
@@ -109,9 +109,9 @@ export default function SelfCheckPanel({
       {articles.length > 0 && (
         <ul className="space-y-2">
           {articles.map((article) => (
-            <li key={article.id} className="rounded border bg-white p-3">
-              <p className="font-medium">{article.judul}</p>
-              <p className="mt-1 text-xs whitespace-pre-wrap text-gray-700">
+            <li key={article.id} className="rounded-lg border bg-[var(--surface)] p-3">
+              <p className="font-semibold text-[var(--foreground)]">{article.judul}</p>
+              <p className="mt-1 text-xs whitespace-pre-wrap text-[var(--secondary)]">
                 {article.solusi}
               </p>
             </li>
@@ -126,14 +126,14 @@ export default function SelfCheckPanel({
             setResolved(true);
             onResolved?.();
           }}
-          className="rounded bg-green-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-800"
+          className="min-h-8 rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800"
         >
           Masalah sudah teratasi
         </button>
         <button
           type="button"
           onClick={() => setDismissed(true)}
-          className="rounded border bg-white px-3 py-1.5 text-xs font-medium hover:bg-gray-50"
+          className="min-h-8 rounded-lg border bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface-muted)]"
         >
           Tetap buat tiket
         </button>

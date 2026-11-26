@@ -57,10 +57,10 @@ export default function PromoteWikiButton({
   return (
     <div className="pt-2">
       {createdId ? (
-        <p className="text-xs text-green-700">
-          Draf SOP dibuat!{" "}
+        <p className="text-xs font-medium text-emerald-700">
+          Draf SOP dibuat.{" "}
           <Link href="/wiki" className="underline">
-            Buka Wiki SOP →
+            Buka Wiki SOP
           </Link>
         </p>
       ) : (
@@ -68,7 +68,7 @@ export default function PromoteWikiButton({
           type="button"
           disabled={busy}
           onClick={() => void handlePromote()}
-          className="rounded border px-3 py-1.5 text-xs font-medium hover:bg-gray-50 disabled:opacity-50"
+          className="min-h-8 rounded-lg border bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface-muted)] disabled:opacity-50"
         >
           {busy ? "Menyimpan..." : "Jadikan Artikel Wiki / SOP"}
         </button>

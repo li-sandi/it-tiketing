@@ -36,7 +36,7 @@ export default function WikiClient({
   const [groupFilter, setGroupFilter] = useState("Semua");
 
   const [judul, setJudul] = useState("");
-  const [grup, setGrup] = useState("Software");
+  const [grup, setGrup] = useState("Software & Aplikasi");
   const [masalah, setMasalah] = useState("");
   const [solusi, setSolusi] = useState("");
   const [kataKunci, setKataKunci] = useState("");
@@ -128,18 +128,20 @@ export default function WikiClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-3 rounded border bg-white p-4">
+      <div className="flex flex-wrap gap-3 rounded-xl border bg-[var(--surface)] p-4 shadow-xs">
         <input
+          aria-label="Cari artikel SOP"
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Cari SOP atau gejala masalah..."
-          className="flex-1 rounded border px-3 py-2 text-sm"
+          className="flex-1 rounded-lg border px-3 py-2 text-sm"
         />
         <select
+          aria-label="Filter kelompok artikel"
           value={groupFilter}
           onChange={(e) => setGroupFilter(e.target.value)}
-          className="rounded border px-3 py-2 text-sm"
+          className="rounded-lg border px-3 py-2 text-sm"
         >
           <option value="Semua">Semua Kelompok</option>
           {GROUPS.map((g) => (
@@ -153,21 +155,25 @@ export default function WikiClient({
       {isStaff && (
         <form
           onSubmit={handleCreate}
-          className="space-y-3 rounded border bg-white p-5"
+          className="space-y-3 rounded-xl border bg-[var(--surface)] p-5 shadow-xs"
         >
-          <h2 className="font-semibold">Tulis Artikel Wiki / SOP Baru</h2>
+          <h2 className="text-base font-semibold text-[var(--foreground)]">
+            Tulis Artikel Wiki / SOP Baru
+          </h2>
           <div className="grid gap-3 sm:grid-cols-3">
             <input
+              aria-label="Judul SOP"
               value={judul}
               onChange={(e) => setJudul(e.target.value)}
               placeholder="Judul SOP"
               required
-              className="rounded border px-3 py-2 text-sm sm:col-span-2"
+              className="rounded-lg border px-3 py-2 text-sm sm:col-span-2"
             />
             <select
+              aria-label="Kelompok SOP"
               value={grup}
               onChange={(e) => setGrup(e.target.value)}
-              className="rounded border px-3 py-2 text-sm"
+              className="rounded-lg border px-3 py-2 text-sm"
             >
               {GROUPS.map((g) => (
                 <option key={g} value={g}>
@@ -177,34 +183,38 @@ export default function WikiClient({
             </select>
           </div>
           <textarea
+            aria-label="Gejala atau masalah"
             value={masalah}
             onChange={(e) => setMasalah(e.target.value)}
             placeholder="Gejala / masalah yang dialami pengguna"
             required
             rows={2}
-            className="w-full rounded border px-3 py-2 text-sm"
+            className="w-full rounded-lg border px-3 py-2 text-sm"
           />
           <textarea
+            aria-label="Langkah penyelesaian"
             value={solusi}
             onChange={(e) => setSolusi(e.target.value)}
             placeholder="Langkah penyelesaian / cek mandiri"
             required
             rows={3}
-            className="w-full rounded border px-3 py-2 text-sm"
+            className="w-full rounded-lg border px-3 py-2 text-sm"
           />
           <div className="flex flex-wrap items-center gap-3">
             <input
+              aria-label="Kata kunci"
               value={kataKunci}
               onChange={(e) => setKataKunci(e.target.value)}
               placeholder="Kata kunci (pisahkan koma)"
-              className="flex-1 rounded border px-3 py-1.5 text-sm"
+              className="flex-1 rounded-lg border px-3 py-1.5 text-sm"
             />
             <select
+              aria-label="Status penerbitan"
               value={status}
               onChange={(e) =>
                 setStatus(e.target.value === "draft" ? "draft" : "published")
               }
-              className="rounded border px-3 py-1.5 text-sm"
+              className="rounded-lg border px-3 py-1.5 text-sm"
             >
               <option value="published">Terbitkan</option>
               <option value="draft">Simpan sebagai Draf</option>
@@ -212,7 +222,7 @@ export default function WikiClient({
             <button
               type="submit"
               disabled={busy}
-              className="rounded bg-black px-4 py-1.5 text-sm text-white disabled:opacity-50"
+              className="min-h-9 rounded-lg bg-[#1d4ed8] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
             >
               Simpan Artikel
             </button>
@@ -221,25 +231,27 @@ export default function WikiClient({
       )}
 
       {error && (
-        <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
         </p>
       )}
 
       <div className="space-y-3">
         {visible.map((article) => (
-          <article key={article.id} className="space-y-2 rounded border bg-white p-5">
+          <article key={article.id} className="space-y-2.5 rounded-xl border bg-[var(--surface)] p-5 shadow-xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                <span className="rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-800">
                   {article.grup}
                 </span>
                 {article.status === "draft" && (
-                  <span className="ml-2 rounded bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-800">
+                  <span className="ml-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
                     Draf
                   </span>
                 )}
-                <h3 className="mt-1 text-lg font-semibold">{article.judul}</h3>
+                <h3 className="mt-1.5 text-base font-semibold text-[var(--foreground)]">
+                  {article.judul}
+                </h3>
               </div>
               {isStaff && (
                 <div className="flex gap-2">
@@ -247,7 +259,7 @@ export default function WikiClient({
                     type="button"
                     disabled={busy}
                     onClick={() => void togglePublish(article)}
-                    className="rounded border px-2.5 py-1 text-xs hover:bg-gray-50"
+                    className="rounded-lg border bg-[var(--surface)] px-2.5 py-1 text-xs font-medium hover:bg-[var(--surface-muted)]"
                   >
                     {article.status === "published" ? "Jadikan Draf" : "Terbitkan"}
                   </button>
@@ -255,23 +267,23 @@ export default function WikiClient({
                     type="button"
                     disabled={busy}
                     onClick={() => void deleteArticle(article.id)}
-                    className="rounded border border-red-200 px-2.5 py-1 text-xs text-red-700 hover:bg-red-50"
+                    className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-100"
                   >
                     Hapus
                   </button>
                 </div>
               )}
             </div>
-            <p className="text-xs text-gray-600">
-              <strong>Masalah:</strong> {article.masalah}
+            <p className="text-xs text-[var(--secondary)]">
+              <strong className="text-[var(--foreground)]">Masalah:</strong> {article.masalah}
             </p>
-            <div className="rounded border bg-gray-50 p-3 text-sm whitespace-pre-wrap">
+            <div className="rounded-lg border bg-[var(--surface-muted)] p-3.5 text-sm whitespace-pre-wrap text-[var(--foreground)]">
               {article.solusi}
             </div>
           </article>
         ))}
         {visible.length === 0 && (
-          <p className="rounded border bg-white p-6 text-center text-sm text-gray-500">
+          <p className="rounded-xl border bg-[var(--surface)] p-6 text-center text-sm text-[var(--muted)]">
             Belum ada artikel SOP yang cocok.
           </p>
         )}

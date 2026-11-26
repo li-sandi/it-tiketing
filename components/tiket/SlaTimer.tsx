@@ -25,7 +25,7 @@ export default function SlaTimer({
   batas: string | null;
   berhenti?: boolean;
 }) {
-  const [remaining, setRemaining] = useState("—");
+  const [remaining, setRemaining] = useState("-");
 
   useEffect(() => {
     if (!batas) return;
@@ -45,8 +45,12 @@ export default function SlaTimer({
   const late = remaining === "LEWAT";
   return (
     <div className="text-sm">
-      <span className="text-gray-600">{label}: </span>
-      <span className={late ? "font-bold text-red-600" : "font-medium"}>
+      <span className="text-[var(--muted)]">{label}: </span>
+      <span
+        className={`tabular-nums ${
+          late ? "font-bold text-red-700" : "font-semibold text-[var(--foreground)]"
+        }`}
+      >
         {remaining}
         {berhenti ? " (berhenti)" : ""}
       </span>

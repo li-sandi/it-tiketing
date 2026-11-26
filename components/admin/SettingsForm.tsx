@@ -67,19 +67,19 @@ export default function SettingsForm({
   return (
     <div className="space-y-6">
       {error && (
-        <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
         </p>
       )}
       {notice && (
-        <p role="status" className="rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+        <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
           {notice}
         </p>
       )}
 
-      <div className="space-y-3 rounded border bg-white p-5">
-        <h2 className="font-semibold">Feature Flags</h2>
-        <label className="flex items-center gap-2 text-sm">
+      <div className="space-y-3 rounded-xl border bg-[var(--surface)] p-5 shadow-xs">
+        <h2 className="text-base font-semibold text-[var(--foreground)]">Feature Flags</h2>
+        <label className="flex items-center gap-2 text-sm text-[var(--secondary)]">
           <input
             type="checkbox"
             checked={flags.auto_close_follow_sla}
@@ -92,7 +92,7 @@ export default function SettingsForm({
           />
           Auto-close mengikuti target SLA resolusi tiap level prioritas
         </label>
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-sm text-[var(--secondary)]">
           <input
             type="checkbox"
             checked={flags.ai_self_check_enabled}
@@ -105,7 +105,7 @@ export default function SettingsForm({
           />
           Aktifkan Cek Mandiri (Wiki/RAG) pada form tiket
         </label>
-        <label className="flex items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-sm text-[var(--secondary)]">
           <input
             type="checkbox"
             checked={flags.sleman_routing_enabled}
@@ -122,22 +122,25 @@ export default function SettingsForm({
           type="button"
           disabled={busy}
           onClick={() => void saveSetting("feature_flags", flags)}
-          className="rounded bg-black px-4 py-1.5 text-sm text-white disabled:opacity-50"
+          className="min-h-9 rounded-lg bg-[#1d4ed8] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
         >
           Simpan Feature Flags
         </button>
       </div>
 
-      <div className="space-y-3 rounded border bg-white p-5">
-        <h2 className="font-semibold">Hari Libur Nasional (SLA P3)</h2>
-        <p className="text-xs text-gray-600">
+      <div className="space-y-3 rounded-xl border bg-[var(--surface)] p-5 shadow-xs">
+        <h2 className="text-base font-semibold text-[var(--foreground)]">
+          Hari Libur Nasional (SLA P3)
+        </h2>
+        <p className="text-xs text-[var(--muted)]">
           Pisahkan dengan koma dalam format YYYY-MM-DD (misal: 2026-12-25,
           2027-01-01).
         </p>
         <input
+          aria-label="Daftar hari libur nasional YYYY-MM-DD"
           value={holidaysText}
           onChange={(e) => setHolidaysText(e.target.value)}
-          className="w-full rounded border px-3 py-2 text-sm"
+          className="w-full rounded-lg border px-3 py-2 text-sm"
         />
         <button
           type="button"
@@ -151,18 +154,23 @@ export default function SettingsForm({
                 .filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s)),
             })
           }
-          className="rounded bg-black px-4 py-1.5 text-sm text-white disabled:opacity-50"
+          className="min-h-9 rounded-lg bg-[#1d4ed8] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
         >
           Simpan Hari Libur
         </button>
       </div>
 
-      <div className="space-y-3 rounded border bg-white p-5">
-        <h2 className="font-semibold">Rate Limit Form Publik</h2>
+      <div className="space-y-3 rounded-xl border bg-[var(--surface)] p-5 shadow-xs">
+        <h2 className="text-base font-semibold text-[var(--foreground)]">
+          Rate Limit Form Publik
+        </h2>
         <div className="grid gap-3 sm:grid-cols-3">
           <div>
-            <label className="mb-1 block text-xs">Batas Umum</label>
+            <label htmlFor="rl-public" className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              Batas Umum
+            </label>
             <input
+              id="rl-public"
               type="number"
               min={1}
               value={rateLimit.public_limit}
@@ -172,12 +180,15 @@ export default function SettingsForm({
                   public_limit: Number(e.target.value),
                 }))
               }
-              className="w-full rounded border px-3 py-1.5 text-sm"
+              className="w-full rounded-lg border px-3 py-1.5 text-sm tabular-nums"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs">Batas Darurat (P0)</label>
+            <label htmlFor="rl-emergency" className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              Batas Darurat (P0)
+            </label>
             <input
+              id="rl-emergency"
               type="number"
               min={1}
               value={rateLimit.emergency_limit}
@@ -187,12 +198,15 @@ export default function SettingsForm({
                   emergency_limit: Number(e.target.value),
                 }))
               }
-              className="w-full rounded border px-3 py-1.5 text-sm"
+              className="w-full rounded-lg border px-3 py-1.5 text-sm tabular-nums"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs">Jendela (menit)</label>
+            <label htmlFor="rl-window" className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              Jendela (menit)
+            </label>
             <input
+              id="rl-window"
               type="number"
               min={1}
               value={rateLimit.window_minutes}
@@ -202,7 +216,7 @@ export default function SettingsForm({
                   window_minutes: Number(e.target.value),
                 }))
               }
-              className="w-full rounded border px-3 py-1.5 text-sm"
+              className="w-full rounded-lg border px-3 py-1.5 text-sm tabular-nums"
             />
           </div>
         </div>
@@ -210,15 +224,17 @@ export default function SettingsForm({
           type="button"
           disabled={busy}
           onClick={() => void saveSetting("rate_limit", rateLimit)}
-          className="rounded bg-black px-4 py-1.5 text-sm text-white disabled:opacity-50"
+          className="min-h-9 rounded-lg bg-[#1d4ed8] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
         >
           Simpan Rate Limit
         </button>
       </div>
 
-      <div className="space-y-3 rounded border bg-white p-5">
-        <h2 className="font-semibold">Laporan Mingguan Telegram</h2>
-        <label className="flex items-center gap-2 text-sm">
+      <div className="space-y-3 rounded-xl border bg-[var(--surface)] p-5 shadow-xs">
+        <h2 className="text-base font-semibold text-[var(--foreground)]">
+          Laporan Mingguan Telegram
+        </h2>
+        <label className="flex items-center gap-2 text-sm text-[var(--secondary)]">
           <input
             type="checkbox"
             checked={weeklyEnabled}
@@ -227,14 +243,15 @@ export default function SettingsForm({
           Aktifkan pengiriman otomatis mingguan (Jumat 14:30 WIB)
         </label>
         <div>
-          <label className="mb-1 block text-xs">
+          <label htmlFor="weekly-chats" className="mb-1 block text-xs font-medium text-[var(--muted)]">
             Chat ID tambahan (opsional, pisahkan koma; admin otomatis menerima)
           </label>
           <input
+            id="weekly-chats"
             value={weeklyChats}
             onChange={(e) => setWeeklyChats(e.target.value)}
             placeholder="Contoh: -100123456789"
-            className="w-full rounded border px-3 py-2 text-sm"
+            className="w-full rounded-lg border px-3 py-2 text-sm"
           />
         </div>
         <button
@@ -249,7 +266,7 @@ export default function SettingsForm({
                 .filter(Boolean),
             })
           }
-          className="rounded bg-black px-4 py-1.5 text-sm text-white disabled:opacity-50"
+          className="min-h-9 rounded-lg bg-[#1d4ed8] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
         >
           Simpan Laporan Mingguan
         </button>

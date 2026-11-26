@@ -67,6 +67,7 @@ Pelapor memilih **Kelompok Kategori** (`Network & VPN`, `Hardware & Periferal`, 
 | `GET/POST /api/wiki`, `PATCH/DELETE /api/wiki/[id]` | Login (`GET`) / IT & Admin (tulis) | Pengelolaan Wiki / SOP |
 | `POST /api/wiki/self-check` | Publik / Login | Pencarian SOP & ringkasan RAG sebelum kirim tiket |
 | `GET/POST /api/aset`, `PATCH/DELETE /api/aset/[id]` | IT / Admin / GA | Inventaris aset & deteksi kandidat upgrade RAM ≤4 GB |
+| `POST /api/aset/import` | IT / Admin / GA | Import massal data aset via CSV (maks. 500 baris per batch, upsert by `nomor_aset`) |
 | `GET/POST /api/stok`, `POST /api/stok/adjust` | GA / IT / Admin | Manajemen stok sparepart (`RAM`, `Headset`, `Mouse`, `Kabel Power`, `Charger Laptop`) & pencatatan mutasi |
 | `GET /api/laporan/export` | IT / Admin | Unduh CSV laporan tiket & SLA |
 | `GET /api/cron/sla-check` | `CRON_SECRET` | Peringatan SLA & queue aging tiap 5 menit |

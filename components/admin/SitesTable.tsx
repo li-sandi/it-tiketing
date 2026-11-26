@@ -73,10 +73,10 @@ export default function SitesTable({ sites }: { sites: Site[] }) {
     <div className="space-y-6">
       <form
         onSubmit={handleCreate}
-        className="flex flex-wrap items-end gap-3 rounded border bg-white p-4"
+        className="flex flex-wrap items-end gap-3 rounded-xl border bg-[var(--surface)] p-5 shadow-xs"
       >
         <div>
-          <label htmlFor="new-site-name" className="mb-1 block text-xs font-medium">
+          <label htmlFor="new-site-name" className="mb-1 block text-xs font-medium text-[var(--muted)]">
             Nama Site Baru
           </label>
           <input
@@ -84,11 +84,11 @@ export default function SitesTable({ sites }: { sites: Site[] }) {
             value={newNama}
             onChange={(e) => setNewNama(e.target.value)}
             required
-            className="rounded border px-3 py-1.5 text-sm"
+            className="rounded-lg border px-3 py-1.5 text-sm"
           />
         </div>
         <div>
-          <label htmlFor="new-site-users" className="mb-1 block text-xs font-medium">
+          <label htmlFor="new-site-users" className="mb-1 block text-xs font-medium text-[var(--muted)]">
             Jumlah User
           </label>
           <input
@@ -98,10 +98,10 @@ export default function SitesTable({ sites }: { sites: Site[] }) {
             value={newUsers}
             onChange={(e) => setNewUsers(e.target.value)}
             required
-            className="w-28 rounded border px-3 py-1.5 text-sm"
+            className="w-28 rounded-lg border px-3 py-1.5 text-sm tabular-nums"
           />
         </div>
-        <label className="flex items-center gap-2 py-1.5 text-sm">
+        <label className="flex items-center gap-2 py-2 text-sm text-[var(--secondary)]">
           <input
             type="checkbox"
             checked={newPunyaIt}
@@ -112,35 +112,45 @@ export default function SitesTable({ sites }: { sites: Site[] }) {
         <button
           type="submit"
           disabled={creating}
-          className="rounded bg-black px-4 py-1.5 text-sm text-white disabled:opacity-50"
+          className="ml-auto min-h-9 rounded-lg bg-[#1d4ed8] px-4 py-1.5 text-sm font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
         >
-          {creating ? "Menyimpan..." : "+ Tambah Site"}
+          {creating ? "Menyimpan..." : "Tambah Site"}
         </button>
       </form>
 
       {error && (
-        <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {error}
         </p>
       )}
 
-      <div className="overflow-x-auto rounded border bg-white">
+      <div className="overflow-x-auto rounded-xl border bg-[var(--surface)] shadow-xs">
         <table className="w-full text-left text-sm">
-          <thead className="border-b bg-gray-100">
+          <thead className="border-b bg-slate-50 text-xs uppercase text-[var(--muted)]">
             <tr>
-              <th className="px-4 py-3">Nama Site</th>
-              <th className="px-4 py-3">Jumlah User</th>
-              <th className="px-4 py-3">IT Lokal</th>
-              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3 font-medium">Nama Site</th>
+              <th className="px-4 py-3 font-medium">Jumlah User</th>
+              <th className="px-4 py-3 font-medium">IT Lokal</th>
+              <th className="px-4 py-3 font-medium">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {sites.map((site) => (
-              <tr key={site.id} className={site.aktif ? "" : "bg-gray-50 opacity-60"}>
-                <td className="px-4 py-3 font-medium">{site.nama}</td>
+              <tr
+                key={site.id}
+                className={
+                  site.aktif
+                    ? "hover:bg-[var(--surface-muted)]"
+                    : "bg-[var(--surface-muted)] opacity-60"
+                }
+              >
+                <td className="px-4 py-3 font-medium text-[var(--foreground)]">
+                  {site.nama}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <input
+                      aria-label={`Jumlah user ${site.nama}`}
                       type="number"
                       min={0}
                       value={userCounts[site.id] ?? site.jumlah_user}
@@ -150,7 +160,7 @@ export default function SitesTable({ sites }: { sites: Site[] }) {
                           [site.id]: Number(e.target.value),
                         }))
                       }
-                      className="w-24 rounded border px-2 py-1 text-sm"
+                      className="w-24 rounded-lg border px-2.5 py-1 text-sm tabular-nums"
                     />
                     <button
                       type="button"
@@ -160,7 +170,7 @@ export default function SitesTable({ sites }: { sites: Site[] }) {
                           jumlah_user: userCounts[site.id] ?? site.jumlah_user,
                         })
                       }
-                      className="rounded border px-2 py-1 text-xs hover:bg-gray-50"
+                      className="rounded-lg border bg-[var(--surface)] px-2.5 py-1 text-xs font-medium hover:bg-[var(--surface-muted)] disabled:opacity-50"
                     >
                       Simpan
                     </button>
@@ -173,7 +183,7 @@ export default function SitesTable({ sites }: { sites: Site[] }) {
                     onClick={() =>
                       void patchSite(site.id, { punya_it: !site.punya_it })
                     }
-                    className="rounded border px-2.5 py-1 text-xs"
+                    className="rounded-lg border bg-[var(--surface)] px-2.5 py-1 text-xs font-medium hover:bg-[var(--surface-muted)] disabled:opacity-50"
                   >
                     {site.punya_it ? "Ya" : "Tidak"}
                   </button>
@@ -185,10 +195,10 @@ export default function SitesTable({ sites }: { sites: Site[] }) {
                     onClick={() =>
                       void patchSite(site.id, { aktif: !site.aktif })
                     }
-                    className={`rounded px-3 py-1 text-xs font-medium ${
+                    className={`rounded-lg border px-3 py-1 text-xs font-medium disabled:opacity-50 ${
                       site.aktif
-                        ? "bg-green-100 text-green-800"
-                        : "bg-gray-200 text-gray-700"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100"
+                        : "border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200"
                     }`}
                   >
                     {site.aktif ? "Aktif" : "Nonaktif"}

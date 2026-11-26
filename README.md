@@ -64,7 +64,7 @@ Fokus operasional saat ini: **Debito Jogja** (400 user, 1 entitas site aktif).
    cp .env.example .env.local
    ```
 
-3. Terapkan migrasi SQL di `supabase/migrations/` secara berurutan (`0001` sampai `0029`), lihat [supabase/README.md](./supabase/README.md). *(Untuk project Supabase `it-ticketing` / `nfpepubznnrmbrutnywl`, migrasi `0020`–`0029` sudah diterapkan langsung ke database live.)*
+3. Terapkan migrasi SQL di `supabase/migrations/` secara berurutan (`0001` sampai `0030`), lihat [supabase/README.md](./supabase/README.md). *(Untuk project Supabase `it-ticketing` / `nfpepubznnrmbrutnywl`, migrasi `0020`–`0030` sudah diterapkan langsung ke database live.)*
 4. Jalankan server pengembangan:
 
    ```bash
@@ -83,11 +83,11 @@ npm run build    # production build
 
 ## Riwayat Perubahan (Changelog)
 
-Rincian lengkap setiap perubahan (migrasi database `0020`–`0029`, endpoint API, perbaikan bug, komponen UI, pengujian, dan paket on-premise) didokumentasikan di [CHANGELOG.md](./CHANGELOG.md).
+Rincian lengkap setiap perubahan (migrasi database `0020`–`0030`, endpoint API, perbaikan bug, komponen UI, pengujian, dan paket on-premise) didokumentasikan di [CHANGELOG.md](./CHANGELOG.md).
 
-Ringkasan rilis terbaru (**2026-11-26 — Antarmuka Corporate Service Desk, Revamp Kategori & Stok Sparepart**):
-- Pembaruan antarmuka bergaya Corporate Service Desk dengan navigasi Sidebar + Top Bar responsif (`AppShell`), dukungan mode terang/gelap terverifikasi kontras WCAG AA, portal beranda dengan ringkasan SLA, dan konsistensi komponen di seluruh halaman publik & internal.
-- Pembaruan kategori IT sesuai *Daily Ticket Report* Debito Jogja + filter kategori internal khusus IT/Admin + modul stok sparepart (`/stok`) dengan pengalihan otomatis ke `menunggu_pengadaan` (bulan depan) bila stok RAM/Headset/Mouse/Kabel Power/Charger Laptop kosong.
+Ringkasan rilis terbaru (**2026-11-26 — Antarmuka Corporate Service Desk, Revamp Kategori, Stok Sparepart, & Kesiapan Operasional**):
+- Pembaruan antarmuka bergaya Corporate Service Desk di seluruh halaman & komponen dalam dengan navigasi Sidebar + Top Bar responsif (`AppShell`), dukungan mode terang/gelap terverifikasi kontras WCAG AA, dan portal beranda SLA.
+- Pembaruan kategori IT sesuai *Daily Ticket Report* Debito Jogja + relasi stok sparepart di Admin Kategori + import massal CSV aset (`/aset`) + seed 10 artikel Wiki/SOP (`0030`) + modul stok sparepart (`/stok`) auto-pengadaan bulan depan.
 - Konsolidasi site menjadi **Debito Jogja** (400 user), pengelompokan kategori 2 langkah, serta peningkatan halaman `/tiket`, `/antrian`, `/dashboard`, dan `/admin/*`.
 - Enkripsi AES-256-GCM untuk password AnyDesk/UV sementara, upload foto layar remote terisolasi (`foto_remote`), audit pembukaan kredensial, dan auto-purge saat tiket selesai.
 - Validasi eskalasi prioritas penuh di DB, SLA P3 hari kerja WIB, pause/resume SLA, queue aging, auto-close sesuai target SLA per level, dan rate limit darurat P0.

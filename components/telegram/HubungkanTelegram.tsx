@@ -23,15 +23,15 @@ export default function HubungkanTelegram({
 
   if (sudahTerhubung) {
     return (
-      <div className="rounded border border-green-200 bg-green-50 p-2 text-sm text-green-700">
-        Telegram sudah terhubung.
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800">
+        Telegram sudah terhubung untuk notifikasi instan.
       </div>
     );
   }
 
   if (!botUsername) {
     return (
-      <div role="alert" className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+      <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
         TELEGRAM_BOT_USERNAME belum diset di environment server.
       </div>
     );
@@ -86,15 +86,20 @@ export default function HubungkanTelegram({
   }
 
   return (
-    <section className="space-y-2 rounded border p-3">
-      <h2 className="text-sm font-medium">Hubungkan Telegram</h2>
+    <section className="space-y-2.5">
+      <h2 className="text-sm font-semibold text-[var(--foreground)]">
+        Hubungkan Telegram
+      </h2>
+      <p className="text-xs text-[var(--muted)]">
+        Terima notifikasi pembaruan tiket, approval, dan peringatan SLA langsung via Telegram.
+      </p>
       <div className="flex flex-wrap gap-2">
         {!telegramUrl ? (
           <button
             type="button"
             onClick={() => void createLink()}
             disabled={loading}
-            className="rounded bg-blue-600 px-3 py-1 text-sm text-white disabled:opacity-50"
+            className="min-h-9 rounded-lg bg-[#1d4ed8] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
           >
             {loading ? "Membuat tautan..." : "1. Buat tautan Telegram"}
           </button>
@@ -104,7 +109,7 @@ export default function HubungkanTelegram({
               href={telegramUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded bg-blue-600 px-3 py-1 text-sm text-white"
+              className="inline-flex min-h-9 items-center rounded-lg bg-[#1d4ed8] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1e40af]"
             >
               1. Buka Bot
             </a>
@@ -112,7 +117,7 @@ export default function HubungkanTelegram({
               type="button"
               onClick={() => void checkConnection()}
               disabled={loading}
-              className="rounded border px-3 py-1 text-sm disabled:opacity-50"
+              className="min-h-9 rounded-lg border bg-[var(--surface)] px-3.5 py-1.5 text-xs font-medium hover:bg-[var(--surface-muted)] disabled:opacity-50"
             >
               {loading ? "Mengecek..." : "2. Cek Koneksi"}
             </button>
@@ -120,7 +125,7 @@ export default function HubungkanTelegram({
         )}
       </div>
       {message && (
-        <p role="status" className="text-xs text-gray-700">
+        <p role="status" className="text-xs text-[var(--secondary)]">
           {message}
         </p>
       )}

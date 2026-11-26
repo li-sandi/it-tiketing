@@ -390,12 +390,14 @@ export default function StokClient({
       <section className="grid gap-6 lg:grid-cols-2">
         <form
           onSubmit={handleCreateItem}
-          className="space-y-3 rounded border bg-white p-5"
+          className="space-y-3 rounded-xl border bg-[var(--surface)] p-5 shadow-xs"
         >
-          <h2 className="text-base font-semibold">Tambah Jenis Sparepart Baru</h2>
+          <h2 className="text-base font-semibold text-[var(--foreground)]">
+            Tambah Jenis Sparepart Baru
+          </h2>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label htmlFor="stok-kode" className="mb-1 block text-xs font-medium">
+              <label htmlFor="stok-kode" className="mb-1 block text-xs font-medium text-[var(--muted)]">
                 Kode Unik (huruf kecil / underscore)
               </label>
               <input
@@ -404,11 +406,11 @@ export default function StokClient({
                 onChange={(e) => setNewKode(e.target.value)}
                 placeholder="ssd_nvme"
                 required
-                className="w-full rounded border px-3 py-1.5 text-sm"
+                className="w-full rounded-lg border px-3 py-1.5 text-sm"
               />
             </div>
             <div>
-              <label htmlFor="stok-nama" className="mb-1 block text-xs font-medium">
+              <label htmlFor="stok-nama" className="mb-1 block text-xs font-medium text-[var(--muted)]">
                 Nama Sparepart
               </label>
               <input
@@ -417,11 +419,11 @@ export default function StokClient({
                 onChange={(e) => setNewNama(e.target.value)}
                 placeholder="SSD NVMe 512GB"
                 required
-                className="w-full rounded border px-3 py-1.5 text-sm"
+                className="w-full rounded-lg border px-3 py-1.5 text-sm"
               />
             </div>
             <div>
-              <label htmlFor="stok-satuan" className="mb-1 block text-xs font-medium">
+              <label htmlFor="stok-satuan" className="mb-1 block text-xs font-medium text-[var(--muted)]">
                 Satuan
               </label>
               <input
@@ -429,11 +431,11 @@ export default function StokClient({
                 value={newSatuan}
                 onChange={(e) => setNewSatuan(e.target.value)}
                 required
-                className="w-full rounded border px-3 py-1.5 text-sm"
+                className="w-full rounded-lg border px-3 py-1.5 text-sm"
               />
             </div>
             <div>
-              <label htmlFor="stok-min" className="mb-1 block text-xs font-medium">
+              <label htmlFor="stok-min" className="mb-1 block text-xs font-medium text-[var(--muted)]">
                 Batas Minimum
               </label>
               <input
@@ -443,43 +445,43 @@ export default function StokClient({
                 value={newMin}
                 onChange={(e) => setNewMin(e.target.value)}
                 required
-                className="w-full rounded border px-3 py-1.5 text-sm"
+                className="w-full rounded-lg border px-3 py-1.5 text-sm tabular-nums"
               />
             </div>
           </div>
           <button
             type="submit"
             disabled={creating}
-            className="rounded bg-black px-4 py-2 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+            className="min-h-9 rounded-lg bg-[#1d4ed8] px-4 py-2 text-xs font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
           >
             {creating ? "Menyimpan..." : "Simpan Item Sparepart"}
           </button>
         </form>
 
-        <div className="rounded border bg-white p-5">
-          <h2 className="mb-3 text-base font-semibold">
+        <div className="rounded-xl border bg-[var(--surface)] p-5 shadow-xs">
+          <h2 className="mb-3 text-base font-semibold text-[var(--foreground)]">
             Riwayat Mutasi Stok Terbaru
           </h2>
           {initialMovements.length === 0 ? (
-            <p className="text-sm text-gray-500">Belum ada mutasi stok tercatat.</p>
+            <p className="text-sm text-[var(--muted)]">Belum ada mutasi stok tercatat.</p>
           ) : (
             <ul className="max-h-72 space-y-2 overflow-y-auto text-xs">
               {initialMovements.map((m) => (
-                <li key={m.id} className="rounded border bg-gray-50 p-2.5">
-                  <div className="flex items-center justify-between gap-2 font-medium">
+                <li key={m.id} className="rounded-lg border bg-[var(--surface-muted)] p-2.5">
+                  <div className="flex items-center justify-between gap-2 font-medium text-[var(--foreground)]">
                     <span>
                       {m.inventory_stocks?.nama ?? "Sparepart"} (
                       {m.perubahan > 0 ? `+${m.perubahan}` : m.perubahan})
                     </span>
-                    <span className="text-gray-500">
-                      {m.stok_sebelum} → {m.stok_sesudah}
+                    <span className="tabular-nums text-[var(--muted)]">
+                      {m.stok_sebelum} ke {m.stok_sesudah}
                     </span>
                   </div>
-                  <p className="mt-0.5 text-gray-600">
+                  <p className="mt-0.5 text-[var(--muted)]">
                     {m.users?.nama ?? "Sistem"} · {formatDate(m.dibuat_pada)}
                     {m.tickets?.nomor_tiket ? ` · ${m.tickets.nomor_tiket}` : ""}
                   </p>
-                  {m.catatan && <p className="text-gray-500">{m.catatan}</p>}
+                  {m.catatan && <p className="text-[var(--secondary)]">{m.catatan}</p>}
                 </li>
               ))}
             </ul>

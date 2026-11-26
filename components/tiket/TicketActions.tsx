@@ -71,14 +71,14 @@ export default function TicketActions({
             type="button"
             disabled={busy}
             onClick={() => void runAction(() => claimTicket(ticketId))}
-            className="rounded bg-black px-4 py-2 text-white hover:bg-gray-800 disabled:opacity-50"
+            className="min-h-10 rounded-lg bg-[#1d4ed8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
           >
             {busy ? "Mengambil..." : "Ambil tiket"}
           </button>
         )}
 
       {status === "ditutup" && (
-        <p className="text-sm text-gray-500">Tiket sudah ditutup.</p>
+        <p className="text-sm text-[var(--muted)]">Tiket sudah ditutup.</p>
       )}
 
       {canUpdate && getNextTicketStatuses(status).length > 0 && (
@@ -96,11 +96,11 @@ export default function TicketActions({
                 }
                 void runAction(() => changeTicketStatus(ticketId, nextStatus));
               }}
-              className="rounded border px-3 py-2 text-sm hover:bg-gray-100 disabled:opacity-50"
+              className="min-h-9 rounded-lg border bg-[var(--surface)] px-3.5 py-1.5 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-muted)] disabled:opacity-50"
             >
               {busy
                 ? "Memproses..."
-                : `→ ${ticketStatusLabels[nextStatus]}`}
+                : `Ubah ke ${ticketStatusLabels[nextStatus]}`}
             </button>
           ))}
         </div>
@@ -109,15 +109,17 @@ export default function TicketActions({
       {canUpdate && completionOpen && status !== "selesai" && (
         <form
           onSubmit={submitCompletion}
-          className="space-y-3 rounded border bg-gray-50 p-4"
+          className="space-y-3 rounded-xl border bg-[var(--surface-muted)] p-4"
         >
-          <h3 className="font-medium">Catatan penyelesaian</h3>
+          <h3 className="text-sm font-semibold text-[var(--foreground)]">
+            Catatan penyelesaian
+          </h3>
           <div>
             <label
               htmlFor="difficulty-points"
-              className="mb-1 block text-sm font-medium"
+              className="mb-1 block text-xs font-medium text-[var(--secondary)]"
             >
-              Poin kesulitan (1–5)
+              Poin kesulitan (1-5)
             </label>
             <select
               id="difficulty-points"
@@ -125,7 +127,7 @@ export default function TicketActions({
               value={poinKesulitan}
               onChange={(event) => setPoinKesulitan(event.target.value)}
               disabled={busy}
-              className="w-full rounded border bg-white px-3 py-2"
+              className="w-full rounded-lg border px-3 py-2 text-sm"
             >
               <option value="">Pilih poin</option>
               {[1, 2, 3, 4, 5].map((point) => (
@@ -138,7 +140,7 @@ export default function TicketActions({
           <div>
             <label
               htmlFor="solution-note"
-              className="mb-1 block text-sm font-medium"
+              className="mb-1 block text-xs font-medium text-[var(--secondary)]"
             >
               Catatan solusi
             </label>
@@ -151,14 +153,14 @@ export default function TicketActions({
               value={catatanSolusi}
               onChange={(event) => setCatatanSolusi(event.target.value)}
               disabled={busy}
-              className="w-full rounded border bg-white px-3 py-2"
+              className="w-full rounded-lg border px-3 py-2 text-sm"
             />
           </div>
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={busy}
-              className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+              className="min-h-9 rounded-lg bg-[#1d4ed8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
             >
               {busy ? "Menyimpan..." : "Selesaikan tiket"}
             </button>
@@ -166,7 +168,7 @@ export default function TicketActions({
               type="button"
               disabled={busy}
               onClick={() => setCompletionOpen(false)}
-              className="rounded border px-4 py-2 disabled:opacity-50"
+              className="min-h-9 rounded-lg border bg-[var(--surface)] px-4 py-2 text-sm font-medium hover:bg-[var(--surface-muted)] disabled:opacity-50"
             >
               Batal
             </button>

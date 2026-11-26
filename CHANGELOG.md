@@ -16,6 +16,11 @@ Seluruh perubahan signifikan pada proyek **IT Ticketing** dicatat pada berkas in
   - Portal utama (`/`) menampilkan tata letak asimetris dengan ringkasan target SLA layanan P0–P3.
   - Halaman `/login` dilengkapi `<label>` aksesibel dan tautan lapor cepat.
   - Seluruh halaman internal (`/dashboard`, `/tiket`, `/tiket/baru`, `/tiket/[id]`, `/antrian`, `/stok`, `/aset`, `/laporan`, `/wiki`, `/admin/*`) terintegrasi dalam `AppShell`, dengan pembaruan visual pada `StatusBadge`, `ItStatusToggle`, `CategoryGroupSelector`, `StockConsumeButton`, `PublicTicketForm`, `TicketForm`, `PublicTicketStatus`, dan `StokClient` (tanpa emoji dekoratif).
+- **Paket Lanjutan Operasional (Admin Relasi Stok, Import CSV Aset, Wiki SOP Seed & Penuntasan Komponen):**
+  - `supabase/migrations/0030_seed_initial_wiki_sop.sql` — seed 10 artikel SOP terpublikasi berdasarkan *Daily Ticket Report* Debito Jogja untuk mengisi basis pengetahuan `/wiki` dan fitur *Cek Mandiri*. Sudah diterapkan ke Supabase live (`nfpepubznnrmbrutnywl`).
+  - `lib/aset-csv.ts`, `lib/__tests__/aset-csv.test.ts`, dan `POST /api/aset/import` — parser CSV + endpoint import massal inventaris aset (maksimal 500 baris per batch, dukungan BOM, pemisah `,`/`;`, template CSV unduhan, serta UI import pada `AssetClient`).
+  - Pengelolaan relasi `stock_kode` langsung di `/admin/kategori` (`KategoriTable`, `POST /api/admin/kategori`, `PATCH /api/admin/kategori/[id]`).
+  - Penuntasan gaya Corporate Service Desk pada seluruh komponen dalam (`SitesTable`, `UserTable`, `SettingsForm`, `GenerateJadwalClient`, `WikiClient`, `TicketActions`, `ApprovalActions`, `MergeTicketPanel`, `RemoteCredentialFields`, `RemoteCredentialPanel`, `SelfCheckPanel`, `SlaTimer`, `UserRatingForm`, `PromoteWikiButton`, `HubungkanTelegram`, `BrowserNotificationToggle`).
 
 ---
 

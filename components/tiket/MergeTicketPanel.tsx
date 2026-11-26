@@ -72,26 +72,32 @@ export default function MergeTicketPanel({
   }
 
   return (
-    <section className="space-y-3 rounded border p-5">
-      <h2 className="font-medium">Gabungkan Tiket Serupa (Merge)</h2>
-      <p className="text-xs text-gray-600">
+    <section className="space-y-3 rounded-xl border bg-[var(--surface)] p-5 shadow-xs">
+      <h2 className="text-sm font-semibold text-[var(--foreground)]">
+        Gabungkan Tiket Serupa (Merge)
+      </h2>
+      <p className="text-xs text-[var(--muted)]">
         Pilih tiket aktif berkategori sama untuk digabungkan ke tiket induk ini:
       </p>
       <ul className="max-h-48 space-y-2 overflow-y-auto text-sm">
         {candidates.map((c) => (
-          <li key={c.id} className="flex items-start gap-2 rounded border p-2">
-            <input
-              type="checkbox"
-              checked={selected.includes(c.id)}
-              onChange={() => toggle(c.id)}
-              className="mt-1"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="font-mono text-xs text-gray-600">
-                {c.nomor_tiket} · {c.prioritas} · {c.pembuat}
-              </p>
-              <p className="truncate text-xs">{c.deskripsi}</p>
-            </div>
+          <li key={c.id}>
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border bg-[var(--surface-muted)] p-2.5">
+              <input
+                type="checkbox"
+                checked={selected.includes(c.id)}
+                onChange={() => toggle(c.id)}
+                className="mt-1"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-xs tabular-nums text-[var(--muted)]">
+                  {c.nomor_tiket} · {c.prioritas} · {c.pembuat}
+                </p>
+                <p className="truncate text-xs text-[var(--foreground)]">
+                  {c.deskripsi}
+                </p>
+              </div>
+            </label>
           </li>
         ))}
       </ul>
@@ -99,7 +105,7 @@ export default function MergeTicketPanel({
         type="button"
         disabled={busy || selected.length === 0}
         onClick={() => void handleMerge()}
-        className="rounded border px-3 py-1.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-50"
+        className="min-h-9 rounded-lg border bg-[var(--surface)] px-3.5 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--surface-muted)] disabled:opacity-50"
       >
         {busy ? "Menggabungkan..." : `Gabungkan (${selected.length})`}
       </button>
@@ -109,7 +115,7 @@ export default function MergeTicketPanel({
         </p>
       )}
       {notice && (
-        <p role="status" className="text-xs text-green-700">
+        <p role="status" className="text-xs text-emerald-700">
           {notice}
         </p>
       )}

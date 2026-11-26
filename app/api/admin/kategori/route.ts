@@ -68,7 +68,23 @@ export async function POST(request: Request) {
     prioritasNaik = parsed;
   }
 
+  let stockKode: string | null = null;
+  if (typeof record.stock_kode === "string" && record.stock_kode.trim()) {
+    stockKode = record.stock_kode.trim();
+  }
+
   const admin = createAdminClient();
+  if (stockKode) {
+    const { data: stockRow } = await admin
+      .from("inventory_stocks")
+      .select("kode")
+      .eq("kode", stockKode)
+      .maybeSingle();
+    if (!stockRow) {
+      return jsonError("Kode stok sparepart tidak ditemukan.", 400);
+    }
+  }
+
   const { data, error } = await admin
     .from("categories")
     .insert({
@@ -77,6 +93,7 @@ export async function POST(request: Request) {
       tipe,
       prioritas_default: prioritasDefault,
       prioritas_naik: prioritasNaik,
+      stock_kode: stockKode,
       butuh_aset: Boolean(record.butuh_aset),
       butuh_foto: Boolean(record.butuh_foto),
       bisa_remote: Boolean(record.bisa_remote),

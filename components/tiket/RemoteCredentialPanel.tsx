@@ -68,15 +68,17 @@ export default function RemoteCredentialPanel({
   }
 
   return (
-    <section className="space-y-3 rounded border p-5">
+    <section className="space-y-3 rounded-xl border bg-[var(--surface)] p-5 shadow-xs">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-medium">Kredensial Remote (AnyDesk &amp; UV)</h2>
+        <h2 className="text-sm font-semibold text-[var(--foreground)]">
+          Kredensial Remote (AnyDesk &amp; UV)
+        </h2>
         {!credentials && (initialCount > 0 || remotePhotoCount > 0) && (
           <button
             type="button"
             disabled={loading}
             onClick={() => void handleReveal()}
-            className="rounded bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50"
+            className="min-h-9 rounded-lg bg-[#1d4ed8] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
           >
             {loading ? "Membuka..." : "Tampilkan Kredensial Remote"}
           </button>
@@ -84,7 +86,7 @@ export default function RemoteCredentialPanel({
       </div>
 
       {!credentials ? (
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-[var(--muted)]">
           {initialCount === 0 && remotePhotoCount === 0
             ? "Tidak ada ID atau foto remote tersimpan."
             : `Tersimpan ${initialCount} entri kredensial dan ${remotePhotoCount} foto layar remote (tersembunyi; setiap pembukaan dicatat di riwayat tiket).`}
@@ -96,10 +98,10 @@ export default function RemoteCredentialPanel({
               {credentials.map((cred) => (
                 <li
                   key={cred.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded border bg-gray-50 p-3 font-mono"
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-[var(--surface-muted)] p-3 font-mono"
                 >
                   <div>
-                    <span className="font-semibold uppercase">
+                    <span className="font-semibold uppercase text-[var(--foreground)]">
                       {cred.aplikasi}
                     </span>
                     : {cred.remoteId}
@@ -108,11 +110,11 @@ export default function RemoteCredentialPanel({
                         · Pass: {cred.password}
                       </span>
                     ) : cred.expired ? (
-                      <span className="ml-3 text-xs text-gray-500">
+                      <span className="ml-3 text-xs text-[var(--muted)]">
                         (password dibersihkan/kedaluwarsa)
                       </span>
                     ) : (
-                      <span className="ml-3 text-xs text-gray-500">
+                      <span className="ml-3 text-xs text-[var(--muted)]">
                         (tanpa password)
                       </span>
                     )}
@@ -124,7 +126,7 @@ export default function RemoteCredentialPanel({
                         onClick={() =>
                           void copyText(`${cred.id}-id`, cred.remoteId)
                         }
-                        className="rounded border bg-white px-2 py-1 font-sans text-xs"
+                        className="rounded-lg border bg-[var(--surface)] px-2.5 py-1 font-sans text-xs font-medium hover:bg-[var(--surface-muted)]"
                       >
                         {copiedId === `${cred.id}-id` ? "Tersalin" : "Salin ID"}
                       </button>
@@ -135,7 +137,7 @@ export default function RemoteCredentialPanel({
                         onClick={() =>
                           void copyText(`${cred.id}-pw`, cred.password!)
                         }
-                        className="rounded border bg-white px-2 py-1 font-sans text-xs"
+                        className="rounded-lg border bg-[var(--surface)] px-2.5 py-1 font-sans text-xs font-medium hover:bg-[var(--surface-muted)]"
                       >
                         {copiedId === `${cred.id}-pw`
                           ? "Tersalin"

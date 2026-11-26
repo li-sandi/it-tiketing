@@ -66,7 +66,7 @@ export default function GenerateJadwalClient({
 
       setPesan({
         type: "success",
-        text: `Berhasil membuat ${result.jumlah} jadwal (${result.mulai}–${result.sampai}).`,
+        text: `Berhasil membuat ${result.jumlah} jadwal (${result.mulai} sampai ${result.sampai}).`,
       });
       router.refresh();
     } catch (error) {
@@ -80,12 +80,12 @@ export default function GenerateJadwalClient({
   }
 
   return (
-    <div className="mb-6 space-y-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+    <div className="mb-6 space-y-4 rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-xs">
       {sites.length > 0 && (
         <div>
           <label
             htmlFor="jadwal-site"
-            className="mb-1 block text-sm font-medium text-blue-900"
+            className="mb-1 block text-xs font-medium text-blue-900"
           >
             Site Tujuan
           </label>
@@ -93,7 +93,7 @@ export default function GenerateJadwalClient({
             id="jadwal-site"
             value={siteId}
             onChange={(e) => setSiteId(e.target.value)}
-            className="rounded border px-3 py-2 text-sm"
+            className="rounded-lg border px-3 py-2 text-sm"
           >
             {sites.map((s) => (
               <option key={s.id} value={s.id}>
@@ -105,7 +105,7 @@ export default function GenerateJadwalClient({
       )}
 
       <div>
-        <span className="mb-1.5 block text-sm font-medium text-blue-900">
+        <span className="mb-2 block text-xs font-medium text-blue-900">
           Petugas IT dalam Rotasi (pilih minimal 2):
         </span>
         {itStaff.length < 2 ? (
@@ -113,11 +113,11 @@ export default function GenerateJadwalClient({
             Dibutuhkan minimal 2 user berperan IT untuk membuat rotasi jadwal.
           </p>
         ) : (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2.5">
             {itStaff.map((staff) => (
               <label
                 key={staff.id}
-                className="flex items-center gap-1.5 rounded border bg-white px-3 py-1.5 text-sm"
+                className="flex cursor-pointer items-center gap-2 rounded-lg border bg-[var(--surface)] px-3 py-1.5 text-sm shadow-xs"
               >
                 <input
                   type="checkbox"
@@ -135,7 +135,7 @@ export default function GenerateJadwalClient({
         type="button"
         onClick={() => void handleGenerate()}
         disabled={loading || selectedStaff.length < 2 || !siteId}
-        className="rounded bg-blue-600 px-4 py-2 font-medium text-white disabled:opacity-50"
+        className="min-h-10 rounded-lg bg-[#1d4ed8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
       >
         {loading ? "Memproses..." : "Generate 8 Minggu ke Depan"}
       </button>
@@ -144,7 +144,7 @@ export default function GenerateJadwalClient({
         <p
           role={pesan.type === "error" ? "alert" : "status"}
           className={`text-sm font-medium ${
-            pesan.type === "error" ? "text-red-700" : "text-green-700"
+            pesan.type === "error" ? "text-red-700" : "text-emerald-800"
           }`}
         >
           {pesan.text}

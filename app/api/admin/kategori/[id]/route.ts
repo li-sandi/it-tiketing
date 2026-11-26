@@ -111,11 +111,31 @@ export async function PATCH(
     }
   }
 
+  const admin = createAdminClient();
+  if ("stock_kode" in record) {
+    if (record.stock_kode === null || record.stock_kode === "") {
+      updates.stock_kode = null;
+    } else if (typeof record.stock_kode === "string") {
+      const stockKode = record.stock_kode.trim();
+      const { data: stockRow } = await admin
+        .from("inventory_stocks")
+        .select("kode")
+        .eq("kode", stockKode)
+        .maybeSingle();
+      if (!stockRow) {
+        return jsonError("Kode stok sparepart tidak ditemukan.", 400);
+      }
+      updates.stock_kode = stockKode;
+    } else {
+      return jsonError("Kode stok sparepart tidak valid.", 400);
+    }
+  }
+
   if (Object.keys(updates).length === 0) {
     return jsonError("Tidak ada perubahan yang dikirim.", 400);
   }
 
-  const { error } = await createAdminClient()
+  const { error } = await admin
     .from("categories")
     .update(updates)
     .eq("id", id);

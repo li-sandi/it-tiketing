@@ -32,10 +32,12 @@ export default function ApprovalActions({ ticketId }: { ticketId: string }) {
   }
 
   return (
-    <div className="space-y-3 rounded border border-yellow-200 bg-yellow-50 p-4">
-      <h3 className="font-medium">Persetujuan GA / Admin</h3>
+    <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-4 shadow-xs">
+      <h3 className="text-sm font-semibold text-amber-950">
+        Persetujuan GA / Admin
+      </h3>
       <div>
-        <label htmlFor="approval-note" className="mb-1 block text-xs font-medium">
+        <label htmlFor="approval-note" className="mb-1 block text-xs font-medium text-amber-900">
           Catatan keputusan (opsional)
         </label>
         <input
@@ -44,7 +46,7 @@ export default function ApprovalActions({ ticketId }: { ticketId: string }) {
           onChange={(e) => setCatatan(e.target.value)}
           maxLength={500}
           placeholder="Contoh: Disetujui pengadaan RAM 8GB"
-          className="w-full rounded border bg-white px-3 py-1.5 text-sm"
+          className="w-full rounded-lg border px-3 py-1.5 text-sm"
         />
       </div>
       <div className="flex gap-2">
@@ -52,7 +54,7 @@ export default function ApprovalActions({ ticketId }: { ticketId: string }) {
           type="button"
           disabled={busy}
           onClick={() => void decide("disetujui")}
-          className="rounded bg-green-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-800 disabled:opacity-50"
+          className="min-h-9 rounded-lg bg-emerald-700 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
         >
           Setujui
         </button>
@@ -60,7 +62,7 @@ export default function ApprovalActions({ ticketId }: { ticketId: string }) {
           type="button"
           disabled={busy}
           onClick={() => void decide("ditolak")}
-          className="rounded bg-red-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-800 disabled:opacity-50"
+          className="min-h-9 rounded-lg bg-red-700 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-red-800 disabled:opacity-50"
         >
           Tolak
         </button>

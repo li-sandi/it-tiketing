@@ -35,12 +35,14 @@ export default function UserRatingForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 rounded border bg-gray-50 p-4"
+      className="space-y-4 rounded-xl border bg-[var(--surface-muted)] p-4"
     >
       <div>
-        <h3 className="font-medium">Tiket sudah selesai. Beri rating:</h3>
-        <p className="text-sm text-gray-500">
-          Rating membantu kami meningkatkan layanan IT.
+        <h3 className="text-sm font-semibold text-[var(--foreground)]">
+          Tiket sudah selesai. Beri rating layanan:
+        </h3>
+        <p className="text-xs text-[var(--muted)]">
+          Rating membantu kami meningkatkan kualitas penanganan IT.
         </p>
       </div>
 
@@ -55,8 +57,8 @@ export default function UserRatingForm({
             onClick={() => setRating(star)}
             className={`text-3xl transition-colors disabled:opacity-50 ${
               rating >= star
-                ? "text-yellow-400"
-                : "text-gray-300 hover:text-yellow-200"
+                ? "text-amber-400"
+                : "text-slate-300 hover:text-amber-300"
             }`}
           >
             ★
@@ -65,12 +67,12 @@ export default function UserRatingForm({
       </div>
 
       {error && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-red-700">
           {error}
         </p>
       )}
       {notice && (
-        <p role="status" className="text-sm text-green-700">
+        <p role="status" className="text-sm text-emerald-700">
           {notice}
         </p>
       )}
@@ -78,7 +80,7 @@ export default function UserRatingForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+        className="min-h-10 rounded-lg bg-[#1d4ed8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
       >
         {pending ? "Menutup..." : "Tutup Tiket & Kirim Rating"}
       </button>

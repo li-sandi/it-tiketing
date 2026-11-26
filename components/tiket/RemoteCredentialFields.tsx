@@ -114,22 +114,24 @@ export default function RemoteCredentialFields({
   ]);
 
   return (
-    <fieldset className="space-y-3 border-l-4 border-blue-200 pl-4">
-      <legend className="font-medium">Akses Remote (AnyDesk &amp; UltraViewer)</legend>
-      <p className="text-sm text-gray-600">
+    <fieldset className="space-y-3 rounded-xl border bg-[var(--surface-muted)] p-4">
+      <legend className="px-1 text-sm font-semibold text-[var(--foreground)]">
+        Akses Remote (AnyDesk &amp; UltraViewer)
+      </legend>
+      <p className="text-xs text-[var(--secondary)]">
         ID bersifat statis dan akan disimpan per aset untuk pengisian otomatis.
         Password yang berubah-ubah dienkripsi sementara hingga tiket selesai,
         atau Anda bisa melampirkan foto/screenshot layar AnyDesk/UltraViewer.
       </p>
       {lookupMessage && assetNumber.trim().length >= 4 && (
-        <p role="status" className="text-xs text-gray-600">
+        <p role="status" className="text-xs font-medium text-blue-700">
           {lookupMessage}
         </p>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor="remote-anydesk-id" className="mb-1 block text-sm font-medium">
+          <label htmlFor="remote-anydesk-id" className="mb-1 block text-xs font-medium text-[var(--foreground)]">
             ID AnyDesk (statis)
           </label>
           <input
@@ -139,13 +141,13 @@ export default function RemoteCredentialFields({
             maxLength={120}
             autoComplete="off"
             placeholder="Contoh: 123 456 789"
-            className="w-full rounded border px-3 py-2"
+            className="w-full rounded-lg border px-3 py-2 text-sm"
           />
         </div>
         <div>
           <label
             htmlFor="remote-anydesk-pass"
-            className="mb-1 block text-sm font-medium"
+            className="mb-1 block text-xs font-medium text-[var(--foreground)]"
           >
             Password AnyDesk (opsional)
           </label>
@@ -157,12 +159,12 @@ export default function RemoteCredentialFields({
               onChange={(event) => onAnydeskPasswordChange(event.target.value)}
               maxLength={200}
               autoComplete="new-password"
-              className="w-full rounded border px-3 py-2"
+              className="w-full rounded-lg border px-3 py-2 text-sm"
             />
             <button
               type="button"
               onClick={() => setShowAnydeskPass((v) => !v)}
-              className="rounded border px-2.5 text-xs hover:bg-gray-50"
+              className="rounded-lg border bg-[var(--surface)] px-3 text-xs font-medium hover:bg-[var(--surface-muted)]"
             >
               {showAnydeskPass ? "Tutup" : "Lihat"}
             </button>
@@ -172,7 +174,7 @@ export default function RemoteCredentialFields({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor="remote-uv-id" className="mb-1 block text-sm font-medium">
+          <label htmlFor="remote-uv-id" className="mb-1 block text-xs font-medium text-[var(--foreground)]">
             ID UltraViewer / UV (statis)
           </label>
           <input
@@ -182,11 +184,11 @@ export default function RemoteCredentialFields({
             maxLength={120}
             autoComplete="off"
             placeholder="Contoh: 12 345 678"
-            className="w-full rounded border px-3 py-2"
+            className="w-full rounded-lg border px-3 py-2 text-sm"
           />
         </div>
         <div>
-          <label htmlFor="remote-uv-pass" className="mb-1 block text-sm font-medium">
+          <label htmlFor="remote-uv-pass" className="mb-1 block text-xs font-medium text-[var(--foreground)]">
             Password UltraViewer (opsional)
           </label>
           <div className="flex gap-2">
@@ -197,12 +199,12 @@ export default function RemoteCredentialFields({
               onChange={(event) => onUvPasswordChange(event.target.value)}
               maxLength={200}
               autoComplete="new-password"
-              className="w-full rounded border px-3 py-2"
+              className="w-full rounded-lg border px-3 py-2 text-sm"
             />
             <button
               type="button"
               onClick={() => setShowUvPass((v) => !v)}
-              className="rounded border px-2.5 text-xs hover:bg-gray-50"
+              className="rounded-lg border bg-[var(--surface)] px-3 text-xs font-medium hover:bg-[var(--surface-muted)]"
             >
               {showUvPass ? "Tutup" : "Lihat"}
             </button>
@@ -211,7 +213,7 @@ export default function RemoteCredentialFields({
       </div>
 
       <div>
-        <label htmlFor="remote-photo" className="mb-1 block text-sm font-medium">
+        <label htmlFor="remote-photo" className="mb-1 block text-xs font-medium text-[var(--foreground)]">
           Foto / Screenshot AnyDesk atau UltraViewer (opsional, maks 5 MB)
         </label>
         <input
@@ -238,24 +240,24 @@ export default function RemoteCredentialFields({
             setRemoteFileError(null);
             onRemoteFileChange(selected);
           }}
-          className="w-full text-sm"
+          className="w-full rounded-lg border bg-[var(--surface)] px-3 py-2 text-sm"
         />
         {remoteFile && (
-          <div className="mt-1 flex items-center gap-3 text-xs text-gray-600">
+          <div className="mt-1.5 flex items-center gap-3 text-xs text-[var(--muted)]">
             <span>
               Terpilih: {remoteFile.name} ({(remoteFile.size / 1024).toFixed(0)} KB)
             </span>
             <button
               type="button"
               onClick={() => onRemoteFileChange(null)}
-              className="underline"
+              className="font-medium text-blue-700 underline"
             >
               Hapus
             </button>
           </div>
         )}
         {remoteFileError && (
-          <p role="alert" className="mt-1 text-xs text-red-600">
+          <p role="alert" className="mt-1 text-xs text-red-700">
             {remoteFileError}
           </p>
         )}

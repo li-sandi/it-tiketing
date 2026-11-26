@@ -56,17 +56,19 @@ export default function BrowserNotificationToggle() {
   return (
     <div className="flex items-center gap-2 text-xs">
       {permission === "granted" ? (
-        <span className="rounded bg-green-100 px-2.5 py-1 font-medium text-green-800">
+        <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 font-medium text-emerald-800">
           Notifikasi Browser Aktif
         </span>
       ) : permission === "denied" ? (
-        <span className="text-gray-500">Notifikasi browser diblokir</span>
+        <span className="rounded-lg border bg-[var(--surface-muted)] px-3 py-1.5 text-[var(--muted)]">
+          Notifikasi browser diblokir
+        </span>
       ) : (
         <button
           type="button"
           disabled={busy}
           onClick={() => void enableNotifications()}
-          className="rounded border px-2.5 py-1 hover:bg-gray-50 disabled:opacity-50"
+          className="min-h-9 rounded-lg border bg-[var(--surface)] px-3 py-1.5 font-medium text-[var(--foreground)] hover:bg-[var(--surface-muted)] disabled:opacity-50"
         >
           {busy ? "Mengaktifkan..." : "Aktifkan Notifikasi Browser"}
         </button>
