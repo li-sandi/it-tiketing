@@ -1,5 +1,6 @@
 import GenerateJadwalClient from "@/components/admin/GenerateJadwalClient";
 import { getJakartaDate } from "@/lib/jadwal-sleman";
+import { getFeatureFlags } from "@/lib/settings";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { connection } from "next/server";
 
@@ -21,18 +22,32 @@ function toUtcDate(date: string) {
 export default async function AdminJadwalPage() {
   await connection();
   const admin = createAdminClient();
-  const { data: jadwal, error: jadwalError } = await admin
-    .from("it_schedule")
-    .select("id, tanggal, it_id")
-    .eq("jenis", "kunjungan_sleman")
-    .gte("tanggal", getJakartaDate())
-    .order("tanggal", { ascending: true });
+  const [
+    { data: jadwal, error: jadwalError },
+    { data: itStaff },
+    { data: remoteSites },
+    flags,
+  ] = await Promise.all([
+    admin
+      .from("it_schedule")
+      .select("id, tanggal, it_id")
+      .eq("jenis", "kunjungan_sleman")
+      .gte("tanggal", getJakartaDate())
+      .order("tanggal", { ascending: true }),
+    admin.from("users").select("id, nama").eq("peran", "it").order("nama"),
+    admin
+      .from("sites")
+      .select("id, nama")
+      .eq("punya_it", false)
+      .order("nama"),
+    getFeatureFlags(),
+  ]);
 
   if (jadwalError) {
-    console.error("Gagal memuat jadwal kunjungan Sleman:", jadwalError.message);
+    console.error("Gagal memuat jadwal kunjungan:", jadwalError.message);
     return (
       <section>
-        <h1 className="mb-6 text-2xl font-bold">Jadwal Kunjungan Sleman</h1>
+        <h1 className="mb-6 text-2xl font-bold">Jadwal Kunjungan</h1>
         <p role="alert" className="text-red-700">
           Gagal memuat jadwal. Silakan muat ulang halaman.
         </p>
@@ -41,21 +56,9 @@ export default async function AdminJadwalPage() {
   }
 
   const itIds = [...new Set((jadwal ?? []).map((item) => item.it_id))];
-  const { data: petugas, error: petugasError } = itIds.length
+  const { data: petugas } = itIds.length
     ? await admin.from("users").select("id, nama").in("id", itIds)
-    : { data: [], error: null };
-
-  if (petugasError) {
-    console.error("Gagal memuat petugas jadwal:", petugasError.message);
-    return (
-      <section>
-        <h1 className="mb-6 text-2xl font-bold">Jadwal Kunjungan Sleman</h1>
-        <p role="alert" className="text-red-700">
-          Gagal memuat nama petugas. Silakan muat ulang halaman.
-        </p>
-      </section>
-    );
-  }
+    : { data: [] };
 
   const namaPetugas = new Map(
     (petugas ?? []).map((user) => [user.id, user.nama]),
@@ -63,12 +66,22 @@ export default async function AdminJadwalPage() {
 
   return (
     <section>
-      <h1 className="mb-2 text-2xl font-bold">Jadwal Kunjungan Sleman</h1>
+      <h1 className="mb-2 text-2xl font-bold">Jadwal Kunjungan Multi-Site</h1>
+      {!flags.sleman_routing_enabled && (
+        <p className="mb-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          Routing kunjungan saat ini <strong>dinonaktifkan</strong> karena
+          sistem fokus pada 1 site (Debito Jogja). Anda dapat mengaktifkannya di{" "}
+          <strong>Admin → Pengaturan</strong> bila site tambahan mulai beroperasi.
+        </p>
+      )}
       <p className="mb-6 text-sm text-gray-600">
-        Jadwal Selasa dan Kamis dibuat bergantian per minggu untuk 8 minggu.
-        Routing tiket onsite Sleman bergantung pada jadwal aktif di bawah ini.
+        Jadwal Selasa dan Kamis dibuat bergantian per minggu untuk 8 minggu
+        berdasarkan daftar petugas IT aktif.
       </p>
-      <GenerateJadwalClient />
+      <GenerateJadwalClient
+        itStaff={itStaff ?? []}
+        sites={remoteSites ?? []}
+      />
 
       <div className="overflow-hidden rounded border bg-white">
         <div className="overflow-x-auto">
@@ -103,8 +116,7 @@ export default async function AdminJadwalPage() {
                     colSpan={3}
                     className="px-4 py-8 text-center text-gray-600"
                   >
-                    Belum ada jadwal kunjungan mendatang. Routing otomatis
-                    Sleman belum siap sampai admin membuat jadwal di atas.
+                    Belum ada jadwal kunjungan mendatang.
                   </td>
                 </tr>
               )}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { redirect } from "next/navigation";
+import AppShell from "@/components/layout/AppShell";
 import { PrioritasBadge, StatusBadge } from "@/components/tiket/StatusBadge";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -20,7 +21,7 @@ const UUID_PATTERN =
 function relationName(
   value: { nama: string } | { nama: string }[] | null,
 ) {
-  return Array.isArray(value) ? value[0]?.nama ?? "—" : value?.nama ?? "—";
+  return Array.isArray(value) ? value[0]?.nama ?? "-" : value?.nama ?? "-";
 }
 
 function formatDate(value: string) {
@@ -45,20 +46,29 @@ export default async function TiketPage({
 
   const { data: profile, error: profileError } = await supabase
     .from("users")
-    .select("peran")
+    .select("nama, peran")
     .eq("id", user.id)
     .maybeSingle();
+
+  const userName = profile?.nama ?? user.email ?? "Pengguna";
+  const role = profile?.peran ?? "user";
+
   if (profileError) {
     return (
-      <main className="mx-auto w-full max-w-5xl p-8">
-        <p role="alert" className="text-red-700">
+      <AppShell
+        userName={userName}
+        userEmail={user.email}
+        role={role}
+        pageTitle="Tiket Aktif"
+      >
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           Gagal memeriksa profil: {profileError.message}
         </p>
-      </main>
+      </AppShell>
     );
   }
 
-  const isStaff = profile?.peran === "it" || profile?.peran === "admin";
+  const isStaff = role === "it" || role === "admin";
   const params = await searchParams;
   const selectedSite =
     typeof params.site === "string" && UUID_PATTERN.test(params.site)
@@ -82,7 +92,11 @@ export default async function TiketPage({
     { data: myHistory, error: historyError },
   ] = await Promise.all([
     activeQuery,
-    supabase.from("sites").select("id, nama").order("nama"),
+    admin
+      .from("sites")
+      .select("id, nama")
+      .eq("aktif", true)
+      .order("nama"),
     supabase
       .from("tickets")
       .select("id, nomor_tiket, status, prioritas, dibuat_pada, categories(nama)")
@@ -92,149 +106,172 @@ export default async function TiketPage({
       .limit(50),
   ]);
 
+  const showSiteFilter = (sites?.length ?? 0) > 1;
+
   return (
-    <main className="mx-auto w-full max-w-5xl space-y-8 p-6 sm:p-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Tiket Aktif</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            Ringkasan tiket aktif lintas site, diurutkan dari prioritas tertinggi.
-          </p>
-        </div>
+    <AppShell
+      userName={userName}
+      userEmail={user.email}
+      role={role}
+      pageTitle="Tiket Aktif"
+      pageSubtitle="Daftar seluruh tiket operasional yang sedang berjalan, diurutkan dari prioritas tertinggi."
+      headerAction={
         <Link
           href="/tiket/baru"
-          className="rounded bg-black px-4 py-2 text-white hover:bg-gray-800"
+          className="inline-flex min-h-9 items-center rounded-lg bg-[#1d4ed8] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1e40af]"
         >
-          + Tiket Baru
+          Buat Tiket Baru
         </Link>
-      </div>
-
-      <form
-        action="/tiket"
-        method="get"
-        className="flex flex-wrap items-end gap-3 rounded border p-4"
-      >
-        <div>
-          <label htmlFor="site-filter" className="mb-1 block text-sm font-medium">
-            Filter site
-          </label>
-          <select
-            id="site-filter"
-            name="site"
-            defaultValue={selectedSite}
-            className="min-w-56 rounded border bg-white px-3 py-2"
-          >
-            <option value="">Semua site</option>
-            {(sites ?? []).map((site) => (
-              <option key={site.id} value={site.id}>
-                {site.nama}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="submit"
-          className="rounded border px-4 py-2 hover:bg-gray-50"
+      }
+    >
+      {showSiteFilter && (
+        <form
+          action="/tiket"
+          method="get"
+          className="flex flex-wrap items-end gap-3 rounded-xl border bg-[var(--surface)] p-4 shadow-xs"
         >
-          Terapkan
-        </button>
-        {selectedSite && (
-          <Link href="/tiket" className="px-2 py-2 text-sm underline">
-            Hapus filter
-          </Link>
-        )}
-        {sitesError && (
-          <p role="alert" className="text-sm text-red-700">
-            Gagal memuat pilihan site: {sitesError.message}
-          </p>
-        )}
-      </form>
+          <div>
+            <label htmlFor="site-filter" className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              Filter Site
+            </label>
+            <select
+              id="site-filter"
+              name="site"
+              defaultValue={selectedSite}
+              className="min-w-56 rounded-lg border px-3 py-1.5 text-sm"
+            >
+              <option value="">Semua site</option>
+              {(sites ?? []).map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.nama}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="submit"
+            className="min-h-10 rounded-lg border bg-[var(--surface)] px-4 py-1.5 text-sm font-medium hover:bg-[var(--surface-muted)]"
+          >
+            Terapkan
+          </button>
+          {selectedSite && (
+            <Link href="/tiket" className="px-2 py-2 text-xs font-medium text-blue-700 hover:underline">
+              Hapus filter
+            </Link>
+          )}
+          {sitesError && (
+            <p role="alert" className="text-sm text-red-700">
+              Gagal memuat pilihan site: {sitesError.message}
+            </p>
+          )}
+        </form>
+      )}
 
       {activeError ? (
-        <p role="alert" className="rounded border border-red-300 p-4 text-red-700">
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           Gagal memuat tiket aktif: {activeError.message}
         </p>
       ) : !activeTickets?.length ? (
-        <p className="rounded border p-6 text-center text-gray-500">
-          Tidak ada tiket aktif untuk filter ini.
-        </p>
+        <div className="rounded-xl border bg-[var(--surface)] p-8 text-center shadow-xs">
+          <p className="text-sm font-medium text-[var(--foreground)]">
+            Tidak ada tiket aktif saat ini.
+          </p>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Seluruh laporan gangguan atau permintaan sudah selesai ditangani.
+          </p>
+        </div>
       ) : (
-        <ul className="space-y-2">
-          {activeTickets.map((ticket) => {
-            const content = (
-              <>
-                <div className="mb-1 flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-xs text-gray-500">
-                    {ticket.nomor_tiket}
-                  </span>
-                  <PrioritasBadge prioritas={ticket.prioritas} />
-                  <StatusBadge status={ticket.status} />
+        <div className="overflow-hidden rounded-xl border bg-[var(--surface)] shadow-xs">
+          <ul className="divide-y">
+            {activeTickets.map((ticket) => {
+              const content = (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-xs font-medium tabular-nums text-[var(--muted)]">
+                        {ticket.nomor_tiket}
+                      </span>
+                      <PrioritasBadge prioritas={ticket.prioritas} />
+                      <StatusBadge status={ticket.status} />
+                    </div>
+                    <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                      {relationName(ticket.categories)}
+                    </p>
+                  </div>
+                  <p className="text-xs text-[var(--muted)]">
+                    {relationName(ticket.sites)} · {formatDate(ticket.dibuat_pada)}
+                  </p>
                 </div>
-                <p className="font-medium">{relationName(ticket.categories)}</p>
-                <p className="mt-1 text-sm text-gray-600">
-                  {relationName(ticket.sites)} · {formatDate(ticket.dibuat_pada)}
-                </p>
-              </>
-            );
-            const canOpen =
-              isStaff || ticket.pembuat_id === user.id;
+              );
+              const canOpen = isStaff || ticket.pembuat_id === user.id;
 
-            return (
-              <li key={ticket.id} className="rounded border p-4">
-                {canOpen ? (
-                  <Link
-                    href={`/tiket/${ticket.id}`}
-                    className="block rounded hover:bg-gray-50"
-                  >
-                    {content}
-                  </Link>
-                ) : (
-                  <div>{content}</div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+              return (
+                <li key={ticket.id}>
+                  {canOpen ? (
+                    <Link
+                      href={`/tiket/${ticket.id}`}
+                      className="block px-4 py-3.5 hover:bg-[var(--surface-muted)] sm:px-5"
+                    >
+                      {content}
+                    </Link>
+                  ) : (
+                    <div className="px-4 py-3.5 sm:px-5">{content}</div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
-      <section className="space-y-3 border-t pt-6">
+      <section className="space-y-3 pt-2">
         <div>
-          <h2 className="text-xl font-semibold">Riwayat tiket saya</h2>
-          <p className="mt-1 text-sm text-gray-600">
-            Tiket selesai dan ditutup yang kamu buat.
+          <h2 className="text-lg font-semibold text-[var(--foreground)]">
+            Riwayat Tiket Saya
+          </h2>
+          <p className="text-xs text-[var(--muted)]">
+            Tiket selesai dan ditutup yang Anda buat.
           </p>
         </div>
         {historyError ? (
-          <p role="alert" className="text-red-700">
+          <p role="alert" className="text-sm text-red-700">
             Gagal memuat riwayat tiket: {historyError.message}
           </p>
         ) : !myHistory?.length ? (
-          <p className="text-sm text-gray-500">Belum ada tiket selesai.</p>
+          <div className="rounded-xl border bg-[var(--surface)] p-6 text-center text-sm text-[var(--muted)]">
+            Belum ada tiket yang selesai.
+          </div>
         ) : (
-          <ul className="space-y-2">
-            {myHistory.map((ticket) => (
-              <li key={ticket.id}>
-                <Link
-                  href={`/tiket/${ticket.id}`}
-                  className="block rounded border p-4 hover:bg-gray-50"
-                >
-                  <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs text-gray-500">
-                      {ticket.nomor_tiket}
-                    </span>
-                    <PrioritasBadge prioritas={ticket.prioritas} />
-                    <StatusBadge status={ticket.status} />
-                  </div>
-                  <p className="font-medium">{relationName(ticket.categories)}</p>
-                  <p className="mt-1 text-sm text-gray-600">
-                    {formatDate(ticket.dibuat_pada)}
-                  </p>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <div className="overflow-hidden rounded-xl border bg-[var(--surface)] shadow-xs">
+            <ul className="divide-y">
+              {myHistory.map((ticket) => (
+                <li key={ticket.id}>
+                  <Link
+                    href={`/tiket/${ticket.id}`}
+                    className="flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 hover:bg-[var(--surface-muted)] sm:px-5"
+                  >
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs tabular-nums text-[var(--muted)]">
+                          {ticket.nomor_tiket}
+                        </span>
+                        <PrioritasBadge prioritas={ticket.prioritas} />
+                        <StatusBadge status={ticket.status} />
+                      </div>
+                      <p className="truncate text-sm font-medium text-[var(--foreground)]">
+                        {relationName(ticket.categories)}
+                      </p>
+                    </div>
+                    <p className="text-xs text-[var(--muted)]">
+                      {formatDate(ticket.dibuat_pada)}
+                    </p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </section>
-    </main>
+    </AppShell>
   );
 }

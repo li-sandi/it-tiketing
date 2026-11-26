@@ -1,15 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import CategoryGroupSelector, {
+  type CategoryOption,
+} from "@/components/tiket/CategoryGroupSelector";
 import RemoteCredentialFields from "@/components/tiket/RemoteCredentialFields";
+import SelfCheckPanel from "@/components/tiket/SelfCheckPanel";
+import { hitungPrioritas, parseAturanKenaikan } from "@/lib/prioritas";
 import {
-  hitungPrioritas,
-  parseAturanKenaikan,
-  type Prioritas,
-} from "@/lib/prioritas";
+  formatProcurementEstimate,
+  resolveInitialTicketStockState,
+  type InventoryStockItem,
+} from "@/lib/stok";
+import { createClient } from "@/lib/supabase/client";
 
 const MAX_ATTACHMENT_SIZE = 5 * 1024 * 1024;
 const IMAGE_EXTENSIONS: Record<string, string> = {
@@ -56,27 +61,18 @@ async function hasSupportedImageSignature(file: File) {
   );
 }
 
-type Category = {
-  id: string;
-  nama: string;
-  tipe: "insiden" | "permintaan" | "internal";
-  prioritas_default: Prioritas;
-  prioritas_naik: unknown;
-  butuh_aset: boolean;
-  butuh_foto: boolean;
-  bisa_remote: boolean;
-};
-
 export default function TicketForm({
   categories,
   userId,
   siteId,
   jumlahUserSite,
+  stocks = [],
 }: {
-  categories: Category[];
+  categories: CategoryOption[];
   userId: string;
   siteId: string | null;
   jumlahUserSite: number;
+  stocks?: InventoryStockItem[];
 }) {
   const router = useRouter();
   const [categoryId, setCategoryId] = useState("");
@@ -88,7 +84,15 @@ export default function TicketForm({
   const [fileError, setFileError] = useState<string | null>(null);
   const [penanganan, setPenanganan] = useState<"remote" | "onsite">("onsite");
   const [anydeskId, setAnydeskId] = useState("");
+  const [anydeskPassword, setAnydeskPassword] = useState("");
   const [uvId, setUvId] = useState("");
+  const [uvPassword, setUvPassword] = useState("");
+  const [remoteFile, setRemoteFile] = useState<File | null>(null);
+  const [ramWarning, setRamWarning] = useState<{
+    ramGb: number;
+    assetName: string | null;
+  } | null>(null);
+  const [requestUpgradeRam, setRequestUpgradeRam] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -96,12 +100,29 @@ export default function TicketForm({
 
   const kategori = categories.find((category) => category.id === categoryId);
   const aturan = parseAturanKenaikan(kategori?.prioritas_naik);
+  const stocksByKode = Object.fromEntries(stocks.map((s) => [s.kode, s]));
+  const stockCheck = resolveInitialTicketStockState(
+    kategori?.stock_kode,
+    stocksByKode,
+  );
   const needsAffectedUsers =
     aturan?.tipe === "persen_site" ||
     aturan?.tipe === "jumlah_user" ||
-    kategori?.nama === "Internet lambat" ||
-    kategori?.nama === "Masalah VPN";
+    (kategori?.nama ?? "").startsWith("Internet lambat") ||
+    (kategori?.nama ?? "").startsWith("Masalah VPN");
   const needsTaskCount = aturan?.tipe === "jumlah_task";
+
+  const handleAssetDetected = useCallback(
+    (info: { ramGb: number | null; assetName: string | null }) => {
+      if (info.ramGb !== null && info.ramGb <= 4) {
+        setRamWarning({ ramGb: info.ramGb, assetName: info.assetName });
+      } else {
+        setRamWarning(null);
+        setRequestUpgradeRam(false);
+      }
+    },
+    [],
+  );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -173,8 +194,9 @@ export default function TicketForm({
           typeof jumlahTask === "number" ? jumlahTask : null,
         nomor_aset: nomorAset.trim() || null,
         penanganan,
+        rekomendasi_upgrade_ram: requestUpgradeRam,
       })
-      .select("id")
+      .select("id, status")
       .single();
 
     if (ticketError || !ticket) {
@@ -187,11 +209,16 @@ export default function TicketForm({
 
     const postCreateWarnings: string[] = [];
 
-    if (file) {
+    const uploads: Array<{ file: File; jenis: "foto" | "foto_remote" }> = [];
+    if (file) uploads.push({ file, jenis: "foto" });
+    if (remoteFile) uploads.push({ file: remoteFile, jenis: "foto_remote" });
+
+    for (const item of uploads) {
       try {
         const attachmentForm = new FormData();
         attachmentForm.set("ticketId", ticket.id);
-        attachmentForm.set("file", file);
+        attachmentForm.set("jenis", item.jenis);
+        attachmentForm.set("file", item.file);
         const uploadResponse = await fetch("/api/tiket/lampiran", {
           method: "POST",
           body: attachmentForm,
@@ -200,7 +227,9 @@ export default function TicketForm({
           error?: string;
         };
         if (!uploadResponse.ok) {
-          postCreateWarnings.push(uploadResult.error ?? "Upload lampiran gagal.");
+          postCreateWarnings.push(
+            uploadResult.error ?? "Upload lampiran gagal.",
+          );
         }
       } catch {
         postCreateWarnings.push(
@@ -209,36 +238,33 @@ export default function TicketForm({
       }
     }
 
-    const remoteRows = [
-      ...(anydeskId.trim()
-        ? [
-            {
-              ticket_id: ticket.id,
-              aplikasi: "anydesk",
-              remote_id: anydeskId.trim(),
-            },
-          ]
-        : []),
-      ...(uvId.trim()
-        ? [
-            {
-              ticket_id: ticket.id,
-              aplikasi: "uv",
-              remote_id: uvId.trim(),
-            },
-          ]
-        : []),
-    ];
-
-    if (remoteRows.length > 0) {
-      const { error: remoteError } = await supabase
-        .from("remote_credentials")
-        .insert(remoteRows);
-
-      if (remoteError) {
-        console.error("Gagal menyimpan ID remote tiket:", remoteError.message);
+    if (
+      anydeskId.trim() ||
+      anydeskPassword.trim() ||
+      uvId.trim() ||
+      uvPassword.trim()
+    ) {
+      try {
+        const credResponse = await fetch("/api/tiket/remote-credentials", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ticketId: ticket.id,
+            anydeskId: anydeskId.trim(),
+            anydeskPassword: anydeskPassword.trim(),
+            uvId: uvId.trim(),
+            uvPassword: uvPassword.trim(),
+          }),
+        });
+        const credResult = (await credResponse.json()) as { error?: string };
+        if (!credResponse.ok) {
+          postCreateWarnings.push(
+            credResult.error ?? "Kredensial remote gagal disimpan.",
+          );
+        }
+      } catch {
         postCreateWarnings.push(
-          `ID remote gagal disimpan: ${remoteError.message}`,
+          "Tidak dapat menghubungi layanan penyimpanan kredensial remote.",
         );
       }
     }
@@ -272,41 +298,65 @@ export default function TicketForm({
       return;
     }
 
-    router.push("/tiket");
+    router.push(
+      ticket.status === "menunggu_pengadaan" ? `/tiket/${ticket.id}` : "/tiket",
+    );
     router.refresh();
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="category" className="mb-1 block text-sm font-medium">
-          Kategori
-        </label>
-        <select
-          id="category"
-          value={categoryId}
-          onChange={(event) => {
-            setCategoryId(event.target.value);
-            setJumlahUser("");
-            setJumlahTask("");
-            setNomorAset("");
-            setFile(null);
-            setFileError(null);
-            setPenanganan("onsite");
-            setAnydeskId("");
-            setUvId("");
-          }}
-          required
-          className="w-full rounded border px-3 py-2"
+      <CategoryGroupSelector
+        categories={categories}
+        selectedCategoryId={categoryId}
+        selectId="category"
+        onSelectCategory={(nextId) => {
+          setCategoryId(nextId);
+          setJumlahUser("");
+          setJumlahTask("");
+          setNomorAset("");
+          setFile(null);
+          setFileError(null);
+          setPenanganan("onsite");
+          setAnydeskId("");
+          setAnydeskPassword("");
+          setUvId("");
+          setUvPassword("");
+          setRemoteFile(null);
+        }}
+      />
+
+      {kategori?.stock_kode && (
+        <div
+          className={`rounded-xl border p-3.5 text-sm ${
+            stockCheck.needsProcurement
+              ? "border-amber-300 bg-amber-50 text-amber-950"
+              : "border-emerald-300 bg-emerald-50 text-emerald-950"
+          }`}
         >
-          <option value="">— pilih kategori —</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.nama} ({category.prioritas_default})
-            </option>
-          ))}
-        </select>
-      </div>
+          {stockCheck.needsProcurement ? (
+            <>
+              <p className="font-semibold">
+                Stok {stockCheck.stockNama} sedang kosong (0 unit)
+              </p>
+              <p className="mt-0.5 text-xs">
+                Tiket tetap dibuat dan otomatis masuk status{" "}
+                <strong>Menunggu Pengadaan</strong> dengan estimasi pengadaan{" "}
+                <strong>
+                  {formatProcurementEstimate(stockCheck.estimasiPengadaan) ??
+                    "bulan depan"}
+                </strong>
+                . SLA dijeda sampai stok tersedia dari pengadaan bulan depan.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs font-semibold">
+              Stok {stockCheck.stockNama} tersedia ({stockCheck.availableCount}{" "}
+              unit) - IT dapat langsung menindaklanjuti tiket ini.
+            </p>
+          )}
+        </div>
+      )}
 
       <div>
         <label htmlFor="description" className="mb-1 block text-sm font-medium">
@@ -322,6 +372,12 @@ export default function TicketForm({
           className="w-full rounded border px-3 py-2"
         />
       </div>
+
+      <SelfCheckPanel
+        categoryId={categoryId}
+        grup={kategori?.grup}
+        deskripsi={deskripsi}
+      />
 
       {needsAffectedUsers && (
         <div>
@@ -382,10 +438,27 @@ export default function TicketForm({
         </div>
       )}
 
+      {ramWarning && (
+        <div className="rounded border border-yellow-200 bg-yellow-50 p-3 text-sm">
+          <p className="font-medium text-yellow-800">
+            Perangkat {ramWarning.assetName ?? nomorAset} terdeteksi memiliki RAM{" "}
+            {ramWarning.ramGb} GB.
+          </p>
+          <label className="mt-2 flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={requestUpgradeRam}
+              onChange={(e) => setRequestUpgradeRam(e.target.checked)}
+            />
+            Ajukan rekomendasi Upgrade RAM ke GA/Admin sekaligus
+          </label>
+        </div>
+      )}
+
       {kategori?.butuh_foto && (
         <div>
           <label htmlFor="ticket-photo" className="mb-1 block text-sm font-medium">
-            Foto / screenshot (wajib, maksimal 5 MB)
+            Foto / screenshot masalah (wajib, maksimal 5 MB)
           </label>
           <input
             key={categoryId}
@@ -467,9 +540,16 @@ export default function TicketForm({
       <RemoteCredentialFields
         assetNumber={nomorAset}
         anydeskId={anydeskId}
+        anydeskPassword={anydeskPassword}
         uvId={uvId}
+        uvPassword={uvPassword}
+        remoteFile={remoteFile}
         onAnydeskIdChange={setAnydeskId}
+        onAnydeskPasswordChange={setAnydeskPassword}
         onUvIdChange={setUvId}
+        onUvPasswordChange={setUvPassword}
+        onRemoteFileChange={setRemoteFile}
+        onAssetDetected={handleAssetDetected}
       />
 
       {error && (

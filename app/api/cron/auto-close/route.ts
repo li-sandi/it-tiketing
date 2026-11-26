@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { cekCronSecret } from "@/lib/cron-auth";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { notifTiketDitutupOtomatis } from "@/lib/notifikasi";
+import { purgeRemoteScreenshots } from "@/lib/remote-cleanup";
+import { getFeatureFlags } from "@/lib/settings";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-const AUTO_CLOSE_AFTER_MS = 24 * 60 * 60 * 1000;
+const FALLBACK_AUTO_CLOSE_AFTER_MS = 24 * 60 * 60 * 1000;
 
 export async function GET(request: Request) {
   if (!cekCronSecret(request)) {
@@ -12,34 +14,50 @@ export async function GET(request: Request) {
 
   try {
     const admin = createAdminClient();
-    const now = Date.now();
-    const cutoff = new Date(now - AUTO_CLOSE_AFTER_MS).toISOString();
-    const { data: tickets, error: ticketsError } = await admin
-      .from("tickets")
-      .select("id")
-      .eq("status", "selesai")
-      .lte("selesai_pada", cutoff);
-
-    if (ticketsError) {
-      throw new Error(`Gagal memuat tiket selesai: ${ticketsError.message}`);
-    }
-
+    const flags = await getFeatureFlags();
     const closedIds: string[] = [];
 
-    for (const ticket of tickets ?? []) {
-      const { data: closed, error: closeError } = await admin.rpc(
-        "auto_close_ticket",
-        {
-          p_ticket_id: ticket.id,
-          p_cutoff: cutoff,
-        },
+    if (flags.auto_close_follow_sla) {
+      const { data: closedRows, error: rpcError } = await admin.rpc(
+        "auto_close_due_tickets",
       );
-
-      if (closeError) {
-        console.error(`Gagal auto-close tiket ${ticket.id}:`, closeError.message);
-        continue;
+      if (rpcError) {
+        throw new Error(`Gagal auto-close sesuai SLA: ${rpcError.message}`);
       }
-      if (closed) closedIds.push(ticket.id);
+      for (const row of closedRows ?? []) {
+        if (typeof row === "string") closedIds.push(row);
+      }
+    } else {
+      const cutoff = new Date(Date.now() - FALLBACK_AUTO_CLOSE_AFTER_MS).toISOString();
+      const { data: tickets, error: ticketsError } = await admin
+        .from("tickets")
+        .select("id")
+        .eq("status", "selesai")
+        .lte("selesai_pada", cutoff);
+      if (ticketsError) {
+        throw new Error(`Gagal memuat tiket selesai: ${ticketsError.message}`);
+      }
+
+      for (const ticket of tickets ?? []) {
+        const { data: closed, error: closeError } = await admin.rpc(
+          "auto_close_ticket",
+          {
+            p_ticket_id: ticket.id,
+            p_cutoff: cutoff,
+          },
+        );
+        if (closeError) {
+          console.error(`Gagal auto-close tiket ${ticket.id}:`, closeError.message);
+          continue;
+        }
+        if (closed) closedIds.push(ticket.id);
+      }
+    }
+
+    for (const ticketId of closedIds) {
+      await purgeRemoteScreenshots(ticketId).catch((err) =>
+        console.error(`Gagal bersihkan foto remote ${ticketId}:`, err),
+      );
     }
 
     const { data: failedDeliveries, error: deliveriesError } = await admin
@@ -49,7 +67,9 @@ export async function GET(request: Request) {
       .eq("status", "failed");
 
     if (deliveriesError) {
-      throw new Error(`Gagal mencari notifikasi auto-close yang gagal: ${deliveriesError.message}`);
+      throw new Error(
+        `Gagal mencari notifikasi auto-close yang gagal: ${deliveriesError.message}`,
+      );
     }
 
     const idsToNotify = [
@@ -70,13 +90,16 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       ok: true,
+      mode: flags.auto_close_follow_sla ? "sla" : "24h",
       closed: closedIds.length,
       notified: notifiedIds.length,
       closedIds,
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Terjadi kesalahan saat auto-close tiket.";
+      error instanceof Error
+        ? error.message
+        : "Terjadi kesalahan saat auto-close tiket.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

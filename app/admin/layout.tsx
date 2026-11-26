@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import type { ReactNode } from "react";
-import AdminNavigation from "@/components/admin/AdminNavigation";
+import AppShell from "@/components/layout/AppShell";
 import { createClient } from "@/lib/supabase/server";
 
 export const instant = false;
@@ -10,6 +11,8 @@ export default async function AdminLayout({
 }: {
   children: ReactNode;
 }) {
+  await connection();
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -18,16 +21,21 @@ export default async function AdminLayout({
 
   const { data: profile, error } = await supabase
     .from("users")
-    .select("peran")
+    .select("nama, peran")
     .eq("id", user.id)
     .maybeSingle();
   if (error) throw new Error(`Gagal memeriksa akses admin: ${error.message}`);
   if (profile?.peran !== "admin") redirect("/dashboard");
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminNavigation />
-      <main className="mx-auto w-full max-w-5xl p-4 sm:p-8">{children}</main>
-    </div>
+    <AppShell
+      userName={profile.nama ?? user.email ?? "Administrator"}
+      userEmail={user.email}
+      role={profile.peran}
+      pageTitle="Admin Panel"
+      pageSubtitle="Pengelolaan konfigurasi sistem, kategori layanan, site, pengguna, dan jadwal."
+    >
+      {children}
+    </AppShell>
   );
 }

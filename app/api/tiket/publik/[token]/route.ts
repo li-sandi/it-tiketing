@@ -23,7 +23,7 @@ export async function GET(
   const { data: ticket, error: ticketError } = await admin
     .from("tickets")
     .select(
-      "id, nomor_tiket, status, prioritas, deskripsi, penanganan, site_id, category_id, it_id, dibuat_pada, selesai_pada, poin_kesulitan, catatan_solusi, rating",
+      "id, nomor_tiket, status, prioritas, prioritas_awal, aging_level, approval_status, estimasi_pengadaan, stock_kode, kunjungan_pada, deskripsi, penanganan, site_id, category_id, it_id, dibuat_pada, selesai_pada, poin_kesulitan, catatan_solusi, rating",
     )
     .eq("akses_token", token)
     .maybeSingle();
@@ -60,8 +60,9 @@ export async function GET(
       .limit(100),
     admin
       .from("attachments")
-      .select("id, path_file")
+      .select("id, path_file, jenis")
       .eq("ticket_id", ticket.id)
+      .neq("jenis", "foto_remote")
       .order("diunggah_pada", { ascending: true })
       .limit(20),
     ticket.it_id
@@ -122,6 +123,12 @@ export async function GET(
         nomor_tiket: ticket.nomor_tiket,
         status: ticket.status,
         prioritas: ticket.prioritas,
+        prioritas_awal: ticket.prioritas_awal,
+        aging_level: ticket.aging_level,
+        approval_status: ticket.approval_status,
+        estimasi_pengadaan: ticket.estimasi_pengadaan,
+        stock_kode: ticket.stock_kode,
+        kunjungan_pada: ticket.kunjungan_pada,
         deskripsi: ticket.deskripsi,
         penanganan: ticket.penanganan,
         dibuat_pada: ticket.dibuat_pada,

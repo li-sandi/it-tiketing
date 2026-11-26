@@ -5,41 +5,65 @@ const adminSections = [
     href: "/admin/kategori",
     title: "Kelola Kategori",
     description:
-      "Atur kategori tiket yang tersedia dan aktif di form pelaporan.",
+      "Tambah, kelompokkan, dan atur prioritas serta syarat formulir tiap kategori.",
+  },
+  {
+    href: "/admin/sites",
+    title: "Kelola Site",
+    description:
+      "Atur site aktif (Debito Jogja), jumlah user untuk ambang P0, dan ketersediaan IT.",
   },
   {
     href: "/admin/users",
     title: "Kelola User",
-    description: "Ubah peran dan site untuk akun yang terdaftar.",
+    description: "Ubah peran (User, IT, GA, Admin) dan site untuk akun terdaftar.",
+  },
+  {
+    href: "/aset",
+    title: "Inventaris Aset",
+    description:
+      "Kelola nomor aset perangkat, kapasitas RAM, serta ID AnyDesk/UV statis.",
+  },
+  {
+    href: "/stok",
+    title: "Stok Sparepart & Pengadaan",
+    description:
+      "Kelola stok RAM, Headset, Mouse, Kabel Power, dan Charger Laptop (GA + IT/Admin).",
+  },
+  {
+    href: "/admin/pengaturan",
+    title: "Pengaturan & Hari Libur",
+    description:
+      "Atur tanggal libur hari kerja P3, batas rate limit, feature flag, dan laporan mingguan.",
   },
   {
     href: "/admin/jadwal",
     title: "Jadwal Kunjungan",
     description:
-      "Lihat dan generate jadwal kunjungan Sleman untuk delapan minggu.",
+      "Kelola jadwal kunjungan dinamis saat routing multi-site diaktifkan.",
   },
 ];
 
 export default function AdminPage() {
   return (
-    <section>
-      <h1 className="mb-2 text-2xl font-bold">Admin Panel</h1>
-      <p className="mb-6 text-sm text-gray-600">
-        Pilih bagian yang ingin dikelola.
-      </p>
+    <section className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {adminSections.map((section) => (
           <Link
             key={section.href}
             href={section.href}
-            className="group rounded-lg border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-md focus-visible:outline-offset-4"
+            className="group flex flex-col justify-between rounded-xl border bg-[var(--surface)] p-5 shadow-xs hover:border-blue-300 hover:bg-[var(--surface-muted)]"
           >
-            <h2 className="mb-2 font-semibold text-blue-700 group-hover:text-blue-800">
-              {section.title}
-            </h2>
-            <p className="text-sm text-gray-600">{section.description}</p>
-            <span className="mt-4 inline-block text-sm font-medium text-blue-700">
-              Buka halaman <span aria-hidden="true">→</span>
+            <div>
+              <h2 className="text-base font-semibold text-[var(--foreground)] group-hover:text-blue-700">
+                {section.title}
+              </h2>
+              <p className="mt-1.5 text-sm text-[var(--secondary)]">
+                {section.description}
+              </p>
+            </div>
+            <span className="mt-4 inline-block text-xs font-semibold text-blue-700">
+              Buka modul
             </span>
           </Link>
         ))}

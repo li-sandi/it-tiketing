@@ -7,6 +7,7 @@ import {
   type TicketStatus,
 } from "@/lib/tiket-status";
 import { notifTiketSelesai } from "@/lib/notifikasi";
+import { purgeRemoteScreenshots } from "@/lib/remote-cleanup";
 
 type ActionResult = {
   error?: string;
@@ -81,7 +82,10 @@ export async function claimTicket(ticketId: string): Promise<ActionResult> {
 
   if (readError) return { error: `Gagal membaca tiket: ${readError.message}` };
   if (!ticket) return { error: "Tiket tidak ditemukan." };
-  if (ticket.status !== "baru" || ticket.it_id) {
+  if (
+    !(ticket.status === "baru" || ticket.status === "menunggu_pengadaan") ||
+    ticket.it_id
+  ) {
     return { error: "Tiket ini sudah diproses atau sudah diambil IT lain." };
   }
 
@@ -94,7 +98,7 @@ export async function claimTicket(ticketId: string): Promise<ActionResult> {
       diproses_pada: now,
     })
     .eq("id", ticketId)
-    .eq("status", "baru")
+    .in("status", ["baru", "menunggu_pengadaan"])
     .is("it_id", null)
     .select("id")
     .maybeSingle();
@@ -118,7 +122,7 @@ export async function claimTicket(ticketId: string): Promise<ActionResult> {
       ticket_id: ticketId,
       aktor_id: context.userId,
       jenis: "status",
-      dari: "baru",
+      dari: ticket.status,
       ke: "diproses",
     },
   ]);
@@ -260,6 +264,9 @@ export async function changeTicketStatus(
 
   let notificationError: string | null = null;
   if (nextStatus === "selesai") {
+    await purgeRemoteScreenshots(ticketId).catch((err) => {
+      console.error("Gagal membersihkan foto remote saat selesai:", err);
+    });
     try {
       await notifTiketSelesai(ticketId);
     } catch (error) {
@@ -272,6 +279,9 @@ export async function changeTicketStatus(
   }
 
   revalidatePath("/tiket");
+  revalidatePath("/antrian");
+  revalidatePath("/dashboard");
+  revalidatePath("/laporan");
   revalidatePath(`/tiket/${ticketId}`);
 
   const warnings = [

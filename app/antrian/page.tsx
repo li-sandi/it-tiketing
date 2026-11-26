@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
+import ItStatusToggle from "@/components/it/ItStatusToggle";
+import AppShell from "@/components/layout/AppShell";
 import { PrioritasBadge, StatusBadge } from "@/components/tiket/StatusBadge";
 import { createClient } from "@/lib/supabase/server";
 
@@ -9,8 +11,8 @@ export const instant = false;
 function getRelationName(
   relation: { nama: string } | { nama: string }[] | null,
 ) {
-  if (Array.isArray(relation)) return relation[0]?.nama ?? "—";
-  return relation?.nama ?? "—";
+  if (Array.isArray(relation)) return relation[0]?.nama ?? "-";
+  return relation?.nama ?? "-";
 }
 
 function formatDate(value: string) {
@@ -32,17 +34,24 @@ export default async function AntrianPage() {
 
   const { data: profile, error: profileError } = await supabase
     .from("users")
-    .select("peran")
+    .select("nama, peran")
     .eq("id", user.id)
     .maybeSingle();
 
+  const userName = profile?.nama ?? user.email ?? "Pengguna";
+
   if (profileError) {
     return (
-      <main className="mx-auto w-full max-w-5xl p-8">
-        <p role="alert" className="text-red-700">
+      <AppShell
+        userName={user.email ?? "Pengguna"}
+        userEmail={user.email}
+        role="user"
+        pageTitle="Antrian IT"
+      >
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           Gagal memeriksa profil: {profileError.message}
         </p>
-      </main>
+      </AppShell>
     );
   }
   if (!profile || !["it", "admin"].includes(profile.peran)) {
@@ -50,7 +59,7 @@ export default async function AntrianPage() {
   }
 
   const ticketFields =
-    "id, nomor_tiket, deskripsi, prioritas, status, dibuat_pada, categories(nama), sites(nama)";
+    "id, nomor_tiket, deskripsi, prioritas, aging_level, status, dibuat_pada, categories(nama), sites(nama)";
   let queueQuery = supabase
     .from("tickets")
     .select(ticketFields)
@@ -58,6 +67,13 @@ export default async function AntrianPage() {
   if (profile.peran === "it") {
     queueQuery = queueQuery.is("it_id", null);
   }
+  const procurementQueueQuery = supabase
+    .from("tickets")
+    .select(ticketFields)
+    .eq("status", "menunggu_pengadaan")
+    .is("it_id", null)
+    .order("prioritas", { ascending: true })
+    .order("dibuat_pada", { ascending: true });
   const myTicketStatuses = [
     ...(profile.peran === "it" ? ["baru"] : []),
     "diproses",
@@ -65,19 +81,29 @@ export default async function AntrianPage() {
     "dijadwalkan_kunjungan",
     "menunggu_pengadaan",
   ];
-  const [{ data: queue, error: queueError }, { data: myTickets, error: myTicketsError }] =
-    await Promise.all([
-      queueQuery
-        .order("prioritas", { ascending: true })
-        .order("dibuat_pada", { ascending: true }),
-      supabase
-        .from("tickets")
-        .select(ticketFields)
-        .eq("it_id", user.id)
-        .in("status", myTicketStatuses)
-        .order("prioritas", { ascending: true })
-        .order("dibuat_pada", { ascending: true }),
-    ]);
+  const [
+    { data: queue, error: queueError },
+    { data: procurementQueue, error: procurementError },
+    { data: myTickets, error: myTicketsError },
+    { data: myStatusRow },
+  ] = await Promise.all([
+    queueQuery
+      .order("prioritas", { ascending: true })
+      .order("dibuat_pada", { ascending: true }),
+    procurementQueueQuery,
+    supabase
+      .from("tickets")
+      .select(ticketFields)
+      .eq("it_id", user.id)
+      .in("status", myTicketStatuses)
+      .order("prioritas", { ascending: true })
+      .order("dibuat_pada", { ascending: true }),
+    supabase
+      .from("it_status")
+      .select("status")
+      .eq("it_id", user.id)
+      .maybeSingle(),
+  ]);
 
   function renderTickets(
     tickets: NonNullable<typeof queue>,
@@ -85,84 +111,121 @@ export default async function AntrianPage() {
     showSite: boolean,
   ) {
     if (!tickets.length) {
-      return <p className="text-sm text-gray-500">{emptyMessage}</p>;
+      return (
+        <div className="rounded-xl border bg-[var(--surface)] p-5 text-sm text-[var(--muted)]">
+          {emptyMessage}
+        </div>
+      );
     }
 
     return (
-      <ul className="space-y-2">
-        {tickets.map((ticket) => (
-          <li key={ticket.id}>
-            <Link
-              href={`/tiket/${ticket.id}`}
-              className="block rounded border p-4 hover:bg-gray-50"
-            >
-              <div className="mb-1 flex flex-wrap items-center gap-3">
-                <span className="font-mono text-xs text-gray-500">
-                  {ticket.nomor_tiket}
-                </span>
-                <PrioritasBadge prioritas={ticket.prioritas} />
-                <StatusBadge status={ticket.status} />
-              </div>
-              <p className="font-medium">
-                {getRelationName(ticket.categories)}
-              </p>
-              <p className="truncate text-sm text-gray-700">
-                {ticket.deskripsi}
-              </p>
-              {showSite && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Site {getRelationName(ticket.sites)} ·{" "}
-                  {formatDate(ticket.dibuat_pada)}
+      <div className="overflow-hidden rounded-xl border bg-[var(--surface)] shadow-xs">
+        <ul className="divide-y">
+          {tickets.map((ticket) => (
+            <li key={ticket.id}>
+              <Link
+                href={`/tiket/${ticket.id}`}
+                className="block px-4 py-3.5 hover:bg-[var(--surface-muted)] sm:px-5"
+              >
+                <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-xs font-medium tabular-nums text-[var(--muted)]">
+                    {ticket.nomor_tiket}
+                  </span>
+                  <PrioritasBadge prioritas={ticket.prioritas} />
+                  <StatusBadge status={ticket.status} />
+                  {(ticket.aging_level ?? 0) > 0 && (
+                    <span className="rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                      Aging +{ticket.aging_level}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm font-semibold text-[var(--foreground)]">
+                  {getRelationName(ticket.categories)}
                 </p>
-              )}
-            </Link>
-          </li>
-        ))}
-      </ul>
+                <p className="mt-0.5 truncate text-sm text-[var(--secondary)]">
+                  {ticket.deskripsi}
+                </p>
+                {showSite && (
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    Site {getRelationName(ticket.sites)} · {formatDate(ticket.dibuat_pada)}
+                  </p>
+                )}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
     );
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl space-y-8 p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Antrian IT</h1>
+    <AppShell
+      userName={userName}
+      userEmail={user.email}
+      role={profile.peran}
+      pageTitle="Antrian IT"
+      pageSubtitle="Kelola antrian masuk berdasarkan prioritas SLA, pengadaan sparepart, dan tiket aktif Anda."
+      headerAction={
         <Link
-          href="/dashboard"
-          className="text-sm text-gray-600 hover:underline"
+          href="/stok"
+          className="inline-flex min-h-9 items-center rounded-lg border bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface-muted)]"
         >
-          ← Dashboard
+          Cek Stok Sparepart
         </Link>
-      </div>
+      }
+    >
+      {profile.peran === "it" && (
+        <ItStatusToggle initialStatus={myStatusRow?.status ?? "free"} />
+      )}
 
-      <section>
-        <h2 className="mb-3 text-lg font-medium">
-          Antrian Baru ({queue?.length ?? 0})
-        </h2>
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-base font-semibold text-[var(--foreground)]">
+            Antrian Baru ({queue?.length ?? 0})
+          </h2>
+        </div>
         {queueError ? (
-          <p role="alert" className="text-red-700">
+          <p role="alert" className="text-sm text-red-700">
             Gagal memuat antrian baru: {queueError.message}
           </p>
         ) : (
-          renderTickets(queue ?? [], "Tidak ada tiket baru. 🎉", true)
+          renderTickets(queue ?? [], "Tidak ada tiket baru di antrian.", true)
         )}
       </section>
 
-      <section>
-        <h2 className="mb-3 text-lg font-medium">
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-[var(--foreground)]">
+          Menunggu Pengadaan Sparepart ({procurementQueue?.length ?? 0})
+        </h2>
+        {procurementError ? (
+          <p role="alert" className="text-sm text-red-700">
+            Gagal memuat antrian pengadaan: {procurementError.message}
+          </p>
+        ) : (
+          renderTickets(
+            procurementQueue ?? [],
+            "Tidak ada tiket yang menunggu pengadaan sparepart.",
+            true,
+          )
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-base font-semibold text-[var(--foreground)]">
           Tiket Saya ({myTickets?.length ?? 0})
         </h2>
         {myTicketsError ? (
-          <p role="alert" className="text-red-700">
+          <p role="alert" className="text-sm text-red-700">
             Gagal memuat tiket yang sedang ditangani: {myTicketsError.message}
           </p>
         ) : (
           renderTickets(
             myTickets ?? [],
-            "Kamu belum memegang tiket aktif.",
+            "Anda belum memegang tiket aktif.",
             false,
           )
         )}
       </section>
-    </main>
+    </AppShell>
   );
 }

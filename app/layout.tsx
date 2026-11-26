@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import ThemeToggle from "@/components/theme/ThemeToggle";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,9 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Layanan IT",
-  description: "Pelaporan dan pemantauan tiket bantuan IT.",
+  title: "IT Service Desk | Debito Jogja",
+  description:
+    "Sistem pelaporan gangguan, antrian SLA, inventaris aset, dan stok sparepart IT Debito Jogja.",
 };
+
+const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('it-ticketing-theme');document.documentElement.dataset.theme=t==='dark'?'dark':'light';}catch(e){document.documentElement.dataset.theme='light';}})();`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -25,9 +27,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="flex min-h-full flex-col">
         {children}
-        <ThemeToggle />
       </body>
     </html>
   );

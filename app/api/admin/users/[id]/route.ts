@@ -6,7 +6,10 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function jsonError(error: string, status: number) {
-  return NextResponse.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(
+    { error },
+    { status, headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 export async function PATCH(
@@ -41,17 +44,25 @@ export async function PATCH(
   }
 
   const admin = createAdminClient();
-  const update: { peran?: "user" | "it" | "admin"; site_id?: string | null } = {};
+  const update: {
+    peran?: "user" | "it" | "admin" | "ga";
+    site_id?: string | null;
+  } = {};
+
   if ("peran" in payload) {
     if (
       payload.peran !== "user" &&
       payload.peran !== "it" &&
-      payload.peran !== "admin"
+      payload.peran !== "admin" &&
+      payload.peran !== "ga"
     ) {
       return jsonError("Peran user tidak valid.", 400);
     }
     if (id === adminUser.user.id && payload.peran !== "admin") {
-      return jsonError("Anda tidak dapat menghapus peran admin milik sendiri.", 400);
+      return jsonError(
+        "Anda tidak dapat menghapus peran admin milik sendiri.",
+        400,
+      );
     }
     if (payload.peran !== "admin") {
       const { count, error: countError } = await admin
@@ -112,5 +123,8 @@ export async function PATCH(
     return jsonError("Gagal menyimpan perubahan user.", 500);
   }
 
-  return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json(
+    { ok: true },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }

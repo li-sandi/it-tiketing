@@ -1,8 +1,11 @@
-import { createClient } from "@/lib/supabase/server";
-import { connection } from "next/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
+import ItStatusToggle from "@/components/it/ItStatusToggle";
+import AppShell from "@/components/layout/AppShell";
+import BrowserNotificationToggle from "@/components/notifications/BrowserNotificationToggle";
 import HubungkanTelegram from "@/components/telegram/HubungkanTelegram";
+import { createClient } from "@/lib/supabase/server";
 
 export const instant = false;
 
@@ -10,7 +13,6 @@ export default async function DashboardPage() {
   await connection();
 
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -22,56 +24,281 @@ export default async function DashboardPage() {
     .eq("id", user.id)
     .maybeSingle();
 
+  const userName = profil?.nama ?? user.email ?? "Pengguna";
+  const peran = profil?.peran ?? "user";
+
   if (profileError) {
     return (
-      <main className="p-8">
-        <h1 className="text-2xl font-semibold">Dashboard Akun</h1>
-        <p role="alert" className="mt-4 text-red-700">
+      <AppShell
+        userName={userName}
+        userEmail={user.email}
+        role={peran}
+        pageTitle="Dashboard"
+      >
+        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           Gagal memuat profil: {profileError.message}
         </p>
-      </main>
+      </AppShell>
     );
   }
 
-  const isStaff = profil?.peran === "it" || profil?.peran === "admin";
+  const isStaff = peran === "it" || peran === "admin";
+  const isAssetOrApproval = isStaff || peran === "ga";
+
+  const [
+    { count: myActiveCount },
+    { data: myPendingRating },
+    { count: queueCount },
+    { count: myAssignedCount },
+    { count: procurementCount },
+    { data: itStatusRow },
+    { data: pendingApprovals },
+  ] = await Promise.all([
+    supabase
+      .from("tickets")
+      .select("id", { count: "exact", head: true })
+      .eq("pembuat_id", user.id)
+      .in("status", [
+        "baru",
+        "diproses",
+        "menunggu_user",
+        "dijadwalkan_kunjungan",
+        "menunggu_pengadaan",
+      ]),
+    supabase
+      .from("tickets")
+      .select("id, nomor_tiket, categories(nama)")
+      .eq("pembuat_id", user.id)
+      .eq("status", "selesai")
+      .limit(5),
+    isStaff
+      ? supabase
+          .from("tickets")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "baru")
+          .is("it_id", null)
+      : Promise.resolve({ count: 0 }),
+    isStaff
+      ? supabase
+          .from("tickets")
+          .select("id", { count: "exact", head: true })
+          .eq("it_id", user.id)
+          .in("status", ["diproses", "menunggu_user", "menunggu_pengadaan"])
+      : Promise.resolve({ count: 0 }),
+    isAssetOrApproval
+      ? supabase
+          .from("tickets")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "menunggu_pengadaan")
+      : Promise.resolve({ count: 0 }),
+    peran === "it"
+      ? supabase
+          .from("it_status")
+          .select("status")
+          .eq("it_id", user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    peran === "ga" || peran === "admin"
+      ? supabase
+          .from("tickets")
+          .select("id, nomor_tiket, deskripsi, categories(nama)")
+          .eq("approval_status", "menunggu")
+          .order("dibuat_pada", { ascending: false })
+          .limit(5)
+      : Promise.resolve({ data: [] }),
+  ]);
 
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-      <p className="mt-2">Halo, {profil?.nama ?? user.email}</p>
-      <p className="text-sm text-gray-600">
-        Peran: {profil?.peran ?? "Belum diatur"}
-      </p>
-      <div className="mt-4 max-w-sm">
-        <HubungkanTelegram
-          botUsername={process.env.TELEGRAM_BOT_USERNAME ?? ""}
-          sudahTerhubung={Boolean(profil?.telegram_id)}
-        />
+    <AppShell
+      userName={userName}
+      userEmail={user.email}
+      role={peran}
+      pageTitle="Dashboard"
+      pageSubtitle="Ringkasan tiket, status penanganan, dan integrasi notifikasi layanan IT Debito Jogja."
+      headerAction={
+        <Link
+          href="/tiket/baru"
+          className="inline-flex min-h-9 items-center rounded-lg bg-[#1d4ed8] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1e40af]"
+        >
+          Buat Tiket Baru
+        </Link>
+      }
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {peran === "it" ? (
+          <ItStatusToggle initialStatus={itStatusRow?.status ?? "free"} />
+        ) : (
+          <div className="text-sm text-[var(--secondary)]">
+            Masuk sebagai <strong className="text-[var(--foreground)]">{userName}</strong>{" "}
+            <span className="rounded-md bg-[var(--surface-muted)] px-2 py-0.5 text-xs font-semibold uppercase text-[var(--muted)]">
+              {peran}
+            </span>
+          </div>
+        )}
+        <BrowserNotificationToggle />
       </div>
-      <div className="mt-6 flex gap-3">
-        <Link href="/tiket" className="rounded border px-4 py-2">
-          Tiket Aktif
-        </Link>
-        <Link href="/tiket/baru" className="rounded bg-black px-4 py-2 text-white">
-          Buat Tiket
-        </Link>
+
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border bg-[var(--surface)] p-4 shadow-xs">
+          <p className="text-xs font-medium text-[var(--muted)]">Tiket Aktif Saya</p>
+          <p className="mt-1.5 text-2xl font-bold tabular-nums text-[var(--foreground)]">
+            {myActiveCount ?? 0}
+          </p>
+          <Link href="/tiket" className="mt-2 inline-block text-xs font-medium text-blue-700 hover:underline">
+            Lihat daftar tiket
+          </Link>
+        </div>
+
         {isStaff && (
-          <Link
-            href="/antrian"
-            className="rounded bg-black px-4 py-2 text-sm text-white"
-          >
-            Buka Antrian IT
-          </Link>
+          <>
+            <div className="rounded-xl border bg-[var(--surface)] p-4 shadow-xs">
+              <p className="text-xs font-medium text-[var(--muted)]">
+                Antrian Baru (Belum Diambil)
+              </p>
+              <p className="mt-1.5 text-2xl font-bold tabular-nums text-[var(--foreground)]">
+                {queueCount ?? 0}
+              </p>
+              <Link href="/antrian" className="mt-2 inline-block text-xs font-medium text-blue-700 hover:underline">
+                Buka antrian IT
+              </Link>
+            </div>
+            <div className="rounded-xl border bg-[var(--surface)] p-4 shadow-xs">
+              <p className="text-xs font-medium text-[var(--muted)]">
+                Sedang Saya Tangani
+              </p>
+              <p className="mt-1.5 text-2xl font-bold tabular-nums text-[var(--foreground)]">
+                {myAssignedCount ?? 0}
+              </p>
+              <Link href="/antrian" className="mt-2 inline-block text-xs font-medium text-blue-700 hover:underline">
+                Kelola pekerjaan
+              </Link>
+            </div>
+          </>
         )}
-        {profil?.peran === "admin" && (
-          <Link
-            href="/admin"
-            className="rounded border px-4 py-2 text-sm font-medium hover:bg-gray-50"
-          >
-            Admin Panel
-          </Link>
+
+        {isAssetOrApproval && (
+          <div className="rounded-xl border bg-[var(--surface)] p-4 shadow-xs">
+            <p className="text-xs font-medium text-[var(--muted)]">
+              Menunggu Pengadaan Sparepart
+            </p>
+            <p className="mt-1.5 text-2xl font-bold tabular-nums text-[var(--foreground)]">
+              {procurementCount ?? 0}
+            </p>
+            <Link href="/stok" className="mt-2 inline-block text-xs font-medium text-blue-700 hover:underline">
+              Pantau stok &amp; pengadaan
+            </Link>
+          </div>
         )}
+      </section>
+
+      {myPendingRating && myPendingRating.length > 0 && (
+        <section className="rounded-xl border border-amber-300 bg-amber-50 p-4 shadow-xs sm:p-5">
+          <h2 className="text-sm font-semibold text-amber-950">
+            Menunggu Konfirmasi &amp; Rating Anda ({myPendingRating.length})
+          </h2>
+          <ul className="mt-2.5 space-y-1.5 text-sm">
+            {myPendingRating.map((t) => {
+              const cat = Array.isArray(t.categories)
+                ? t.categories[0]?.nama
+                : (t.categories as { nama?: string } | null)?.nama;
+              return (
+                <li key={t.id}>
+                  <Link
+                    href={`/tiket/${t.id}`}
+                    className="font-medium text-amber-900 underline hover:text-amber-950"
+                  >
+                    {t.nomor_tiket} · {cat ?? "Tiket"} (beri rating)
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {pendingApprovals && pendingApprovals.length > 0 && (
+        <section className="rounded-xl border border-blue-200 bg-blue-50 p-4 shadow-xs sm:p-5">
+          <h2 className="text-sm font-semibold text-blue-900">
+            Menunggu Persetujuan GA / Admin ({pendingApprovals.length})
+          </h2>
+          <ul className="mt-2.5 space-y-1.5 text-sm">
+            {pendingApprovals.map((t) => {
+              const cat = Array.isArray(t.categories)
+                ? t.categories[0]?.nama
+                : (t.categories as { nama?: string } | null)?.nama;
+              return (
+                <li key={t.id}>
+                  <Link
+                    href={`/tiket/${t.id}`}
+                    className="font-medium text-blue-800 underline hover:text-blue-950"
+                  >
+                    {t.nomor_tiket} · {cat ?? "Permintaan"}:{" "}
+                    {t.deskripsi.slice(0, 80)}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border bg-[var(--surface)] p-5 shadow-xs">
+          <HubungkanTelegram
+            botUsername={process.env.TELEGRAM_BOT_USERNAME ?? ""}
+            sudahTerhubung={Boolean(profil?.telegram_id)}
+          />
+        </div>
+
+        <section className="rounded-xl border bg-[var(--surface)] p-5 shadow-xs">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">
+            Pintasan Layanan Cepat
+          </h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">
+            Akses cepat ke panduan mandiri dan modul yang relevan dengan peran Anda.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2.5">
+            <Link
+              href="/wiki"
+              className="inline-flex min-h-9 items-center rounded-lg border bg-[var(--surface-muted)] px-3.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--border)]"
+            >
+              Wiki &amp; SOP
+            </Link>
+            {isStaff && (
+              <Link
+                href="/laporan"
+                className="inline-flex min-h-9 items-center rounded-lg border bg-[var(--surface-muted)] px-3.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--border)]"
+              >
+                Laporan &amp; Beban Kerja
+              </Link>
+            )}
+            {isAssetOrApproval && (
+              <>
+                <Link
+                  href="/aset"
+                  className="inline-flex min-h-9 items-center rounded-lg border bg-[var(--surface-muted)] px-3.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--border)]"
+                >
+                  Inventaris Aset
+                </Link>
+                <Link
+                  href="/stok"
+                  className="inline-flex min-h-9 items-center rounded-lg border bg-[var(--surface-muted)] px-3.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--border)]"
+                >
+                  Stok Sparepart
+                </Link>
+              </>
+            )}
+            {peran === "admin" && (
+              <Link
+                href="/admin"
+                className="inline-flex min-h-9 items-center rounded-lg border bg-[var(--surface-muted)] px-3.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--border)]"
+              >
+                Admin Panel
+              </Link>
+            )}
+          </div>
+        </section>
       </div>
-    </main>
+    </AppShell>
   );
 }

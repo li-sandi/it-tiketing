@@ -4,12 +4,14 @@ import { addDaysToDate, getJakartaDate } from "@/lib/jadwal-sleman";
 import {
   buildTicketLink,
   compactDescription,
+  notifApprovalDiperlukan,
   notifP0Broadcast,
   notifTiketBaru,
   notifyTicketRecipients,
 } from "@/lib/notifikasi";
+import { getFeatureFlags } from "@/lib/settings";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { escapeHtml } from "@/lib/telegram";
+import { escapeHtml, kirimPesan } from "@/lib/telegram";
 
 export type KunjunganInfo = {
   mode: "hari_ini" | "dijadwalkan";
@@ -73,6 +75,11 @@ async function kirimNotifikasiKunjungan(
 export async function arahkanTiketSleman(
   ticketId: string,
 ): Promise<{ kunjungan: KunjunganInfo; warnings: string[] } | null> {
+  const flags = await getFeatureFlags();
+  if (!flags.sleman_routing_enabled) {
+    return null;
+  }
+
   const admin = createAdminClient();
   const { data: ticket, error: ticketError } = await admin
     .from("tickets")
@@ -98,7 +105,7 @@ export async function arahkanTiketSleman(
   ] = await Promise.all([
     admin
       .from("sites")
-      .select("id, nama, punya_it")
+      .select("id, nama, punya_it, aktif")
       .eq("id", ticket.site_id)
       .maybeSingle(),
     admin
@@ -111,7 +118,7 @@ export async function arahkanTiketSleman(
   if (categoryError) {
     throw new Error(`Gagal membaca kategori tiket: ${categoryError.message}`);
   }
-  if (!site || site.punya_it) return null;
+  if (!site || !site.aktif || site.punya_it) return null;
 
   const today = getJakartaDate();
   const { data: upcoming, error: scheduleError } = await admin
@@ -242,7 +249,10 @@ export async function prosesNotifikasiTiketBaru(ticketId: string) {
     );
   }
 
-  const tasks: Promise<unknown>[] = [notifP0Broadcast(ticketId)];
+  const tasks: Promise<unknown>[] = [
+    notifP0Broadcast(ticketId),
+    notifApprovalDiperlukan(ticketId),
+  ];
   if (!routed) tasks.push(notifTiketBaru(ticketId));
   const results = await Promise.allSettled(tasks);
   for (const result of results) {
@@ -262,6 +272,11 @@ export async function prosesNotifikasiTiketBaru(ticketId: string) {
 }
 
 export async function kirimPengingatKunjungan() {
+  const flags = await getFeatureFlags();
+  if (!flags.sleman_routing_enabled) {
+    return { tanggal: getJakartaDate(), penerima: 0, tiket: 0, disabled: true };
+  }
+
   const admin = createAdminClient();
   const tomorrow = addDaysToDate(getJakartaDate(), 1);
   const { data: schedule, error: scheduleError } = await admin
@@ -292,9 +307,9 @@ export async function kirimPengingatKunjungan() {
   const ticketsQuery = siteIds.length
     ? await admin
         .from("tickets")
-          .select(
-            "id, site_id, it_id, status, kunjungan_pada, nomor_tiket, prioritas, deskripsi, categories(nama)",
-          )
+        .select(
+          "id, site_id, it_id, status, kunjungan_pada, nomor_tiket, prioritas, deskripsi, categories(nama)",
+        )
         .in("site_id", siteIds)
         .eq("penanganan", "onsite")
         .eq("status", "dijadwalkan_kunjungan")
@@ -330,6 +345,27 @@ export async function kirimPengingatKunjungan() {
         `Petugas ${itId} tidak ditemukan untuk pengingat ${tomorrow}.`,
       );
     }
+    const siteId = assignedTickets[0]?.site_id;
+    if (!siteId) continue;
+
+    // Atomic per-(site_id, tanggal, it_id) deduplication
+    const { data: claimed } = await admin
+      .from("schedule_reminder_deliveries")
+      .upsert(
+        {
+          site_id: siteId,
+          tanggal: tomorrow,
+          it_id: itId,
+          ticket_count: assignedTickets.length,
+        },
+        { onConflict: "site_id,tanggal,it_id", ignoreDuplicates: true },
+      )
+      .select("it_id");
+
+    if (!claimed?.length) {
+      continue;
+    }
+
     const list = assignedTickets
       .map((ticket) => {
         const category = Array.isArray(ticket.categories)
@@ -342,14 +378,68 @@ export async function kirimPengingatKunjungan() {
 
 ${list}`;
 
-    await notifyTicketRecipients(
-      assignedTickets[0].id,
-      "kunjungan_sleman_reminder",
-      [recipient],
-      message,
-    );
+    await kirimPesan(Number(recipient.telegram_id), message);
     sent++;
   }
 
   return { tanggal: tomorrow, penerima: sent, tiket: ticketRows.length };
+}
+
+export async function cekJadwalSlemanHampirHabis() {
+  const flags = await getFeatureFlags();
+  if (!flags.sleman_routing_enabled) return { checked: false };
+
+  const admin = createAdminClient();
+  const today = getJakartaDate();
+  const horizon = addDaysToDate(today, 14);
+
+  const { data: sites } = await admin
+    .from("sites")
+    .select("id, nama")
+    .eq("aktif", true)
+    .eq("punya_it", false);
+
+  if (!sites?.length) return { checked: true, warnings: 0 };
+
+  let warningsSent = 0;
+  for (const site of sites) {
+    const { data: futureSchedules } = await admin
+      .from("it_schedule")
+      .select("tanggal")
+      .eq("site_id", site.id)
+      .eq("jenis", "kunjungan_sleman")
+      .gte("tanggal", today)
+      .order("tanggal", { ascending: false })
+      .limit(1);
+
+    const lastDate = futureSchedules?.[0]?.tanggal;
+    if (!lastDate || lastDate < horizon) {
+      const lockKey = `schedule_expiry_notified_${site.id}`;
+      const { data: stateRow } = await admin
+        .from("bot_state")
+        .select("value")
+        .eq("key", lockKey)
+        .maybeSingle();
+      if (stateRow?.value === (lastDate ?? "none")) continue;
+
+      const { data: admins } = await admin
+        .from("users")
+        .select("telegram_id")
+        .eq("peran", "admin")
+        .not("telegram_id", "is", null);
+
+      const text = `⚠️ <b>Jadwal Kunjungan ${escapeHtml(site.nama)} Hampir Habis</b>\nJadwal terakhir: ${escapeHtml(lastDate ?? "Belum ada")}. Silakan generate ulang jadwal 8 minggu di Admin Panel.`;
+      for (const adm of admins ?? []) {
+        const chatId = Number(adm.telegram_id);
+        if (Number.isSafeInteger(chatId)) {
+          await kirimPesan(chatId, text).catch(() => null);
+        }
+      }
+      await admin
+        .from("bot_state")
+        .upsert({ key: lockKey, value: lastDate ?? "none" }, { onConflict: "key" });
+      warningsSent++;
+    }
+  }
+  return { checked: true, warnings: warningsSent };
 }

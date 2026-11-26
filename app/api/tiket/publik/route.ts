@@ -1,67 +1,18 @@
 import { NextResponse } from "next/server";
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { prosesNotifikasiTiketBaru } from "@/lib/sleman";
+import { encryptSecret } from "@/lib/crypto";
+import { validateImageFile } from "@/lib/image-validation";
 import { hitungPrioritas, parseAturanKenaikan } from "@/lib/prioritas";
+import {
+  checkPublicTicketRateLimit,
+  resolveRateLimitNumbers,
+} from "@/lib/rate-limit";
+import { getRateLimitSetting } from "@/lib/settings";
+import { prosesNotifikasiTiketBaru } from "@/lib/sleman";
+import { createAdminClient } from "@/lib/supabase/admin";
 
-function createRateLimiter() {
-  return new Ratelimit({
-    redis: Redis.fromEnv(),
-    limiter: Ratelimit.slidingWindow(20, "15 m"),
-    analytics: false,
-    prefix: "it-ticketing:public-ticket",
-  });
-}
-
-let rateLimiter: ReturnType<typeof createRateLimiter> | undefined;
-
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const MAX_REQUEST_SIZE = 6 * 1024 * 1024;
+const MAX_REQUEST_SIZE = 11 * 1024 * 1024;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const IMAGE_FORMATS = [
-  {
-    mimeType: "image/jpeg",
-    extension: "jpg",
-    matches: (bytes: Uint8Array) =>
-      bytes.length >= 3 &&
-      bytes[0] === 0xff &&
-      bytes[1] === 0xd8 &&
-      bytes[2] === 0xff,
-  },
-  {
-    mimeType: "image/png",
-    extension: "png",
-    matches: (bytes: Uint8Array) =>
-      bytes.length >= 8 &&
-      bytes[0] === 0x89 &&
-      bytes[1] === 0x50 &&
-      bytes[2] === 0x4e &&
-      bytes[3] === 0x47 &&
-      bytes[4] === 0x0d &&
-      bytes[5] === 0x0a &&
-      bytes[6] === 0x1a &&
-      bytes[7] === 0x0a,
-  },
-  {
-    mimeType: "image/gif",
-    extension: "gif",
-    matches: (bytes: Uint8Array) =>
-      bytes.length >= 6 &&
-      ["GIF87a", "GIF89a"].includes(
-        String.fromCharCode(...bytes.subarray(0, 6)),
-      ),
-  },
-  {
-    mimeType: "image/webp",
-    extension: "webp",
-    matches: (bytes: Uint8Array) =>
-      bytes.length >= 12 &&
-      String.fromCharCode(...bytes.subarray(0, 4)) === "RIFF" &&
-      String.fromCharCode(...bytes.subarray(8, 12)) === "WEBP",
-  },
-] as const;
 
 function jsonError(message: string, status: number) {
   return NextResponse.json(
@@ -82,7 +33,7 @@ function isPriority(value: string): value is "P0" | "P1" | "P2" | "P3" {
 async function rollbackTicket(
   admin: ReturnType<typeof createAdminClient>,
   ticketId: string,
-  uploadedPath: string | null,
+  uploadedPaths: string[],
 ) {
   const { error: deleteError } = await admin
     .from("tickets")
@@ -93,10 +44,10 @@ async function rollbackTicket(
     return `Tiket sementara ${ticketId} gagal dibatalkan: ${deleteError.message}`;
   }
 
-  if (uploadedPath) {
+  if (uploadedPaths.length) {
     const { error: removeError } = await admin.storage
       .from("ticket-attachments")
-      .remove([uploadedPath]);
+      .remove(uploadedPaths);
     if (removeError) {
       return `Tiket dibatalkan, tetapi file sementara gagal dibersihkan: ${removeError.message}`;
     }
@@ -108,7 +59,7 @@ async function rollbackTicket(
 export async function POST(request: Request) {
   const contentLength = Number(request.headers.get("content-length"));
   if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_SIZE) {
-    return jsonError("Ukuran permintaan maksimal 6 MB.", 413);
+    return jsonError("Ukuran permintaan maksimal 11 MB.", 413);
   }
 
   const origin = request.headers.get("origin");
@@ -127,54 +78,6 @@ export async function POST(request: Request) {
     forwardedFor?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip")?.trim() ||
     "127.0.0.1";
-  const redisConfigured =
-    Boolean(process.env.UPSTASH_REDIS_REST_URL) &&
-    Boolean(process.env.UPSTASH_REDIS_REST_TOKEN);
-  if (!redisConfigured) {
-    console.error("Rate limit tiket publik tidak tersedia: konfigurasi Upstash belum lengkap.");
-    return jsonError("Layanan pengaman form sementara tidak tersedia.", 503);
-  }
-
-  try {
-    rateLimiter ??= createRateLimiter();
-    const { success, limit, remaining, reset } = await rateLimiter.limit(ip);
-
-    if (!success) {
-      const secondsRemaining = Math.max(
-        1,
-        Math.ceil((reset - Date.now()) / 1000),
-      );
-      console.warn(
-        "Permintaan tiket publik ditolak oleh rate limit:",
-        JSON.stringify({
-          event: "public_ticket_rate_limited",
-          limit,
-          remaining,
-          retryAfterSeconds: secondsRemaining,
-        }),
-      );
-      return NextResponse.json(
-        {
-          error: `Terlalu banyak permintaan. Coba lagi dalam ${Math.ceil(secondsRemaining / 60)} menit.`,
-        },
-        {
-          status: 429,
-          headers: {
-            "Cache-Control": "no-store",
-            "X-RateLimit-Limit": String(limit),
-            "X-RateLimit-Remaining": String(remaining),
-            "Retry-After": String(secondsRemaining),
-          },
-        },
-      );
-    }
-  } catch (error) {
-    console.error(
-      "Rate limit tiket publik gagal menghubungi Upstash:",
-      error instanceof Error ? error.message : "Kesalahan Redis tidak diketahui.",
-    );
-    return jsonError("Layanan pengaman form sementara tidak tersedia.", 503);
-  }
 
   let formData: FormData;
   try {
@@ -197,13 +100,23 @@ export async function POST(request: Request) {
   const nomorAset = textField(formData, "nomorAset");
   const penanganan = textField(formData, "penanganan");
   const anydeskId = textField(formData, "anydeskId");
+  const anydeskPassword = textField(formData, "anydeskPassword");
   const uvId = textField(formData, "uvId");
+  const uvPassword = textField(formData, "uvPassword");
+  const rekomendasiUpgradeRam =
+    textField(formData, "rekomendasiUpgradeRam") === "true";
+
   const fileValue = formData.get("file");
   if (fileValue instanceof File && fileValue.size === 0) {
     return jsonError("File lampiran kosong.", 400);
   }
-  const file =
-    fileValue instanceof File ? fileValue : null;
+  const file = fileValue instanceof File ? fileValue : null;
+
+  const remoteFileValue = formData.get("remoteFile");
+  if (remoteFileValue instanceof File && remoteFileValue.size === 0) {
+    return jsonError("File foto remote kosong.", 400);
+  }
+  const remoteFile = remoteFileValue instanceof File ? remoteFileValue : null;
 
   if (nama.length < 2 || nama.length > 120) {
     return jsonError("Nama harus berisi 2 sampai 120 karakter.", 400);
@@ -220,9 +133,11 @@ export async function POST(request: Request) {
   if (
     nomorAset.length > 120 ||
     anydeskId.length > 120 ||
-    uvId.length > 120
+    uvId.length > 120 ||
+    anydeskPassword.length > 200 ||
+    uvPassword.length > 200
   ) {
-    return jsonError("Nomor aset atau ID remote terlalu panjang.", 400);
+    return jsonError("Nomor aset atau kredensial remote terlalu panjang.", 400);
   }
   if (penanganan !== "remote" && penanganan !== "onsite") {
     return jsonError("Pilihan penanganan tidak valid.", 400);
@@ -254,24 +169,31 @@ export async function POST(request: Request) {
   if (fileValue && !(fileValue instanceof File)) {
     return jsonError("Lampiran tidak valid.", 400);
   }
-  if (file && file.size > MAX_FILE_SIZE) {
-    return jsonError("Ukuran file maksimal 5 MB.", 400);
+  if (remoteFileValue && !(remoteFileValue instanceof File)) {
+    return jsonError("Lampiran foto remote tidak valid.", 400);
   }
 
   const admin = createAdminClient();
   const [
     { data: category, error: categoryError },
     { data: site, error: siteError },
+    rateLimitSetting,
   ] = await Promise.all([
     admin
       .from("categories")
       .select(
-        "id, nama, tipe, prioritas_default, prioritas_naik, butuh_aset, butuh_foto, bisa_remote",
+        "id, nama, tipe, prioritas_default, prioritas_naik, butuh_aset, butuh_foto, bisa_remote, stock_kode",
       )
       .eq("id", categoryId)
       .eq("aktif", true)
+      .neq("tipe", "internal")
       .maybeSingle(),
-    admin.from("sites").select("id, jumlah_user").eq("id", siteId).maybeSingle(),
+    admin
+      .from("sites")
+      .select("id, jumlah_user, aktif")
+      .eq("id", siteId)
+      .maybeSingle(),
+    getRateLimitSetting(),
   ]);
 
   if (categoryError) {
@@ -282,14 +204,8 @@ export async function POST(request: Request) {
     console.error("Gagal memeriksa site tiket publik:", siteError.message);
     return jsonError("Gagal memeriksa site tiket.", 500);
   }
-  if (!category || !site) {
-    console.warn("Lookup referensi tiket publik tidak menemukan baris.", {
-      siteId,
-      categoryId,
-      siteFound: Boolean(site),
-      categoryFound: Boolean(category),
-    });
-    if (!site) return jsonError("Site tidak ditemukan.", 400);
+  if (!category || !site || !site.aktif) {
+    if (!site || !site.aktif) return jsonError("Site tidak ditemukan atau tidak aktif.", 400);
     return jsonError("Kategori tidak ditemukan atau tidak aktif.", 400);
   }
   if (!isPriority(category.prioritas_default)) {
@@ -305,11 +221,13 @@ export async function POST(request: Request) {
   if (penanganan === "remote" && !category.bisa_remote) {
     return jsonError("Kategori ini tidak mendukung penanganan remote.", 400);
   }
+
   const rule = parseAturanKenaikan(category.prioritas_naik);
   const needsAffectedUsers =
     rule?.tipe === "persen_site" ||
     rule?.tipe === "jumlah_user" ||
-    ["Internet lambat", "Masalah VPN"].includes(category.nama);
+    category.nama.startsWith("Internet lambat") ||
+    category.nama.startsWith("Masalah VPN");
   if (needsAffectedUsers && jumlahUser === null) {
     return jsonError("Masukkan jumlah user terdampak (minimal 1).", 400);
   }
@@ -320,22 +238,6 @@ export async function POST(request: Request) {
     return jsonError("Jumlah task tidak berlaku untuk kategori ini.", 400);
   }
 
-  let imageFormat: (typeof IMAGE_FORMATS)[number] | null = null;
-  if (file) {
-    const header = new Uint8Array(await file.slice(0, 12).arrayBuffer());
-    imageFormat =
-      IMAGE_FORMATS.find(
-        (format) =>
-          format.mimeType === file.type && format.matches(header),
-      ) ?? null;
-    if (!imageFormat) {
-      return jsonError(
-        "File harus berupa gambar JPEG, PNG, WebP, atau GIF yang valid.",
-        400,
-      );
-    }
-  }
-
   const prioritas = hitungPrioritas({
     prioritasDefault: category.prioritas_default,
     aturan: rule,
@@ -343,6 +245,91 @@ export async function POST(request: Request) {
     jumlahUserSite: site.jumlah_user,
     jumlahTaskVendor: jumlahTask ?? undefined,
   });
+
+  // Rate limit check (general vs emergency P0 quota)
+  const limits = resolveRateLimitNumbers({
+    publicLimit: rateLimitSetting.public_limit,
+    emergencyLimit: rateLimitSetting.emergency_limit,
+    windowMinutes: rateLimitSetting.window_minutes,
+  });
+  const isEmergency = prioritas === "P0";
+  try {
+    const rateResult = await checkPublicTicketRateLimit({
+      ip,
+      bucket: isEmergency ? "emergency" : "general",
+      limit: isEmergency ? limits.emergencyLimit : limits.publicLimit,
+      windowMinutes: limits.windowMinutes,
+    });
+
+    if (!rateResult.success) {
+      const secondsRemaining = Math.max(
+        1,
+        Math.ceil((rateResult.reset - Date.now()) / 1000),
+      );
+      console.warn(
+        "Permintaan tiket publik ditolak oleh rate limit:",
+        JSON.stringify({
+          event: "public_ticket_rate_limited",
+          bucket: isEmergency ? "emergency" : "general",
+          limit: rateResult.limit,
+          remaining: rateResult.remaining,
+          retryAfterSeconds: secondsRemaining,
+        }),
+      );
+      return NextResponse.json(
+        {
+          error: `Terlalu banyak permintaan. Coba lagi dalam ${Math.ceil(secondsRemaining / 60)} menit.`,
+        },
+        {
+          status: 429,
+          headers: {
+            "Cache-Control": "no-store",
+            "X-RateLimit-Limit": String(rateResult.limit),
+            "X-RateLimit-Remaining": String(rateResult.remaining),
+            "Retry-After": String(secondsRemaining),
+          },
+        },
+      );
+    }
+  } catch (error) {
+    console.error(
+      "Rate limit tiket publik gagal:",
+      error instanceof Error ? error.message : "Kesalahan rate limit.",
+    );
+    return jsonError("Layanan pengaman form sementara tidak tersedia.", 503);
+  }
+
+  let problemImageFormat: Awaited<ReturnType<typeof validateImageFile>> | null =
+    null;
+  if (file) {
+    problemImageFormat = await validateImageFile(file);
+    if (!problemImageFormat.ok) {
+      return jsonError(problemImageFormat.error, 400);
+    }
+  }
+
+  let remoteImageFormat: Awaited<ReturnType<typeof validateImageFile>> | null =
+    null;
+  if (remoteFile) {
+    remoteImageFormat = await validateImageFile(remoteFile);
+    if (!remoteImageFormat.ok) {
+      return jsonError(`Foto remote tidak valid: ${remoteImageFormat.error}`, 400);
+    }
+  }
+
+  let encryptedAnydeskPass: string | null = null;
+  let encryptedUvPass: string | null = null;
+  try {
+    if (anydeskPassword) encryptedAnydeskPass = encryptSecret(anydeskPassword);
+    if (uvPassword) encryptedUvPass = encryptSecret(uvPassword);
+  } catch (err) {
+    console.error("Gagal mengenkripsi password remote:", err);
+    return jsonError(
+      "Konfigurasi enkripsi kredensial remote belum tersedia.",
+      500,
+    );
+  }
+
   const accessToken = crypto.randomUUID();
   const { data: ticket, error: insertError } = await admin
     .from("tickets")
@@ -360,8 +347,9 @@ export async function POST(request: Request) {
       jumlah_task: jumlahTask,
       nomor_aset: nomorAset || null,
       penanganan,
+      rekomendasi_upgrade_ram: rekomendasiUpgradeRam,
     })
-    .select("id, nomor_tiket")
+    .select("id, nomor_tiket, prioritas, status, estimasi_pengadaan, stock_kode")
     .single();
 
   if (insertError || !ticket) {
@@ -372,45 +360,83 @@ export async function POST(request: Request) {
     return jsonError("Gagal membuat tiket. Silakan coba lagi.", 500);
   }
 
-  let uploadedPath: string | null = null;
+  const uploadedPaths: string[] = [];
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
   const credentials = [
-    ...(anydeskId
-      ? [{ ticket_id: ticket.id, aplikasi: "anydesk", remote_id: anydeskId }]
+    ...(anydeskId || encryptedAnydeskPass
+      ? [
+          {
+            ticket_id: ticket.id,
+            aplikasi: "anydesk",
+            remote_id: anydeskId || "-",
+            password_terenkripsi: encryptedAnydeskPass,
+            kedaluwarsa_pada: encryptedAnydeskPass ? expiresAt : null,
+          },
+        ]
       : []),
-    ...(uvId
-      ? [{ ticket_id: ticket.id, aplikasi: "uv", remote_id: uvId }]
+    ...(uvId || encryptedUvPass
+      ? [
+          {
+            ticket_id: ticket.id,
+            aplikasi: "uv",
+            remote_id: uvId || "-",
+            password_terenkripsi: encryptedUvPass,
+            kedaluwarsa_pada: encryptedUvPass ? expiresAt : null,
+          },
+        ]
       : []),
   ];
+
   if (credentials.length) {
     const { error: credentialError } = await admin
       .from("remote_credentials")
       .insert(credentials);
     if (credentialError) {
-      const cleanupError = await rollbackTicket(admin, ticket.id, null);
-      console.error(
-        "Gagal menyimpan ID remote tiket publik:",
-        credentialError.message,
-      );
+      const cleanupError = await rollbackTicket(admin, ticket.id, uploadedPaths);
+      console.error("Gagal menyimpan kredensial remote:", credentialError.message);
       return jsonError(
         cleanupError
-          ? `Gagal menyimpan ID remote dan membatalkan tiket: ${cleanupError}`
-          : "Gagal menyimpan ID remote. Tiket tidak dibuat.",
+          ? `Gagal menyimpan kredensial remote dan membatalkan tiket: ${cleanupError}`
+          : "Gagal menyimpan kredensial remote. Tiket tidak dibuat.",
         500,
       );
     }
   }
 
-  if (file && imageFormat) {
-    const path = `tickets/${ticket.id}/${crypto.randomUUID()}.${imageFormat.extension}`;
+  const uploads: Array<{
+    file: File;
+    mimeType: string;
+    extension: string;
+    jenis: "foto" | "foto_remote";
+  }> = [];
+  if (file && problemImageFormat?.ok) {
+    uploads.push({
+      file,
+      mimeType: problemImageFormat.format.mimeType,
+      extension: problemImageFormat.format.extension,
+      jenis: "foto",
+    });
+  }
+  if (remoteFile && remoteImageFormat?.ok) {
+    uploads.push({
+      file: remoteFile,
+      mimeType: remoteImageFormat.format.mimeType,
+      extension: remoteImageFormat.format.extension,
+      jenis: "foto_remote",
+    });
+  }
+
+  for (const item of uploads) {
+    const path = `tickets/${ticket.id}/${crypto.randomUUID()}.${item.extension}`;
     const { error: uploadError } = await admin.storage
       .from("ticket-attachments")
-      .upload(path, file, {
-        contentType: imageFormat.mimeType,
+      .upload(path, item.file, {
+        contentType: item.mimeType,
         upsert: false,
       });
     if (uploadError) {
-      const cleanupError = await rollbackTicket(admin, ticket.id, null);
+      const cleanupError = await rollbackTicket(admin, ticket.id, uploadedPaths);
       console.error("Upload lampiran tiket publik gagal:", uploadError.message);
       return jsonError(
         cleanupError
@@ -419,15 +445,15 @@ export async function POST(request: Request) {
         502,
       );
     }
-    uploadedPath = path;
+    uploadedPaths.push(path);
 
     const { error: attachmentError } = await admin.from("attachments").insert({
       ticket_id: ticket.id,
       path_file: path,
-      jenis: "foto",
+      jenis: item.jenis,
     });
     if (attachmentError) {
-      const cleanupError = await rollbackTicket(admin, ticket.id, uploadedPath);
+      const cleanupError = await rollbackTicket(admin, ticket.id, uploadedPaths);
       console.error("Metadata lampiran publik gagal disimpan:", attachmentError.message);
       return jsonError(
         cleanupError
@@ -448,6 +474,10 @@ export async function POST(request: Request) {
       ok: true,
       id: ticket.id,
       nomorTiket: ticket.nomor_tiket,
+      prioritas: ticket.prioritas,
+      status: ticket.status,
+      estimasiPengadaan: ticket.estimasi_pengadaan,
+      stockKode: ticket.stock_kode,
       token: accessToken,
       kunjungan,
       warnings,

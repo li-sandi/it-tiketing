@@ -56,7 +56,7 @@ export async function POST(request: Request) {
   const createdAt = new Date(ticket.dibuat_pada).getTime();
   const ageMs = Date.now() - createdAt;
   if (
-    ticket.status !== "baru" ||
+    !(ticket.status === "baru" || ticket.status === "menunggu_pengadaan") ||
     !Number.isFinite(createdAt) ||
     ageMs < 0 ||
     ageMs > 5 * 60 * 1000

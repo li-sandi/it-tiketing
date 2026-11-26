@@ -2,12 +2,20 @@
 
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
+import { PrioritasBadge, StatusBadge } from "@/components/tiket/StatusBadge";
+import { formatProcurementEstimate } from "@/lib/stok";
 import { ticketStatusLabels } from "@/lib/tiket-status";
 
 type TicketStatusData = {
   nomor_tiket: string;
   status: string;
   prioritas: string;
+  prioritas_awal?: string | null;
+  aging_level?: number;
+  approval_status?: string;
+  estimasi_pengadaan?: string | null;
+  stock_kode?: string | null;
+  kunjungan_pada?: string | null;
   deskripsi: string;
   penanganan: string;
   dibuat_pada: string;
@@ -52,6 +60,9 @@ function describeEvent(event: TicketDetail["events"][number]) {
     return `Status berubah: ${from} → ${to}`;
   }
   if (event.jenis === "assign") return "Tiket ditugaskan ke IT";
+  if (event.jenis === "aging") return `Prioritas naik otomatis (${event.dari} → ${event.ke})`;
+  if (event.jenis === "merge") return `Digabungkan ke tiket induk ${event.ke}`;
+  if (event.jenis === "approval") return `Status persetujuan: ${event.ke}`;
   return "Pembaruan tiket";
 }
 
@@ -158,32 +169,91 @@ export default function PublicTicketStatus({ token }: { token: string }) {
 
   const { tiket } = detail;
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 p-6 sm:p-8">
-      <div>
-        <Link href="/" className="text-sm text-gray-600 hover:underline">
-          ← Beranda
-        </Link>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <h1 className="font-mono text-lg font-semibold">{tiket.nomor_tiket}</h1>
-          <span className="rounded border px-2 py-1 text-sm">{tiket.prioritas}</span>
-          <span className="rounded border px-2 py-1 text-sm">
-            {ticketStatusLabels[tiket.status as keyof typeof ticketStatusLabels] ??
-              tiket.status}
-          </span>
+    <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-8 sm:px-6">
+      <div className="rounded-xl border bg-[var(--surface)] p-5 shadow-xs sm:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="font-mono text-sm font-semibold tabular-nums text-[var(--foreground)]">
+              {tiket.nomor_tiket}
+            </h1>
+            <PrioritasBadge prioritas={tiket.prioritas} />
+            <StatusBadge status={tiket.status} />
+          </div>
+          <Link
+            href="/lapor"
+            className="text-xs font-medium text-blue-700 hover:underline"
+          >
+            Buat tiket baru
+          </Link>
         </div>
-        <h2 className="mt-2 text-xl font-semibold">{tiket.kategori ?? "Tiket"}</h2>
+        <h2 className="mt-3 text-xl font-bold text-[var(--foreground)]">
+          {tiket.kategori ?? "Tiket Layanan"}
+        </h2>
       </div>
 
-      <section className="grid gap-3 rounded border p-4 sm:grid-cols-2">
-        <p>Site: {tiket.site ?? "—"}</p>
-        <p>Penanganan: {tiket.penanganan === "remote" ? "Remote" : "Onsite"}</p>
-        <p>Dibuat: {formatDate(tiket.dibuat_pada)}</p>
-        <p>Ditangani oleh: {tiket.it ?? "Belum ditugaskan"}</p>
+      <section className="grid gap-4 rounded-xl border bg-[var(--surface)] p-5 shadow-xs sm:grid-cols-2">
+        <div>
+          <p className="text-xs font-medium text-[var(--muted)]">Site</p>
+          <p className="mt-0.5 text-sm font-medium">{tiket.site ?? "-"}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-[var(--muted)]">Penanganan</p>
+          <p className="mt-0.5 text-sm font-medium">
+            {tiket.penanganan === "remote" ? "Remote" : "Onsite"}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-[var(--muted)]">Waktu Lapor</p>
+          <p className="mt-0.5 text-sm font-medium">{formatDate(tiket.dibuat_pada)}</p>
+        </div>
+        <div>
+          <p className="text-xs font-medium text-[var(--muted)]">Petugas IT</p>
+          <p className="mt-0.5 text-sm font-medium">
+            {tiket.it ?? "Belum ditugaskan"}
+          </p>
+        </div>
+        {tiket.kunjungan_pada && (
+          <p className="sm:col-span-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800">
+            Jadwal Kunjungan:{" "}
+            {new Date(`${tiket.kunjungan_pada}T00:00:00.000Z`).toLocaleDateString(
+              "id-ID",
+              { weekday: "long", dateStyle: "long", timeZone: "UTC" },
+            )}
+          </p>
+        )}
+        {tiket.approval_status && tiket.approval_status !== "tidak_perlu" && (
+          <p className="sm:col-span-2 text-sm text-[var(--secondary)]">
+            Status Persetujuan GA:{" "}
+            <strong className="capitalize text-[var(--foreground)]">
+              {tiket.approval_status}
+            </strong>
+          </p>
+        )}
+        {tiket.status === "menunggu_pengadaan" && (
+          <div className="sm:col-span-2 rounded-lg border border-amber-300 bg-amber-50 p-3.5 text-sm text-amber-950">
+            <p className="font-semibold">
+              Menunggu Pengadaan Sparepart Bulan Depan
+            </p>
+            <p className="mt-0.5 text-xs">
+              Stok sparepart ({tiket.stock_kode ?? "terkait"}) sedang kosong.
+              Estimasi pengadaan:{" "}
+              <strong>
+                {formatProcurementEstimate(tiket.estimasi_pengadaan) ??
+                  "Awal bulan depan"}
+              </strong>
+              .
+            </p>
+          </div>
+        )}
       </section>
 
-      <section className="rounded border p-4">
-        <h2 className="mb-2 font-medium">Deskripsi</h2>
-        <p className="whitespace-pre-wrap">{tiket.deskripsi}</p>
+      <section className="rounded-xl border bg-[var(--surface)] p-5 shadow-xs">
+        <h2 className="mb-2 text-sm font-semibold text-[var(--foreground)]">
+          Deskripsi Masalah
+        </h2>
+        <p className="whitespace-pre-wrap text-sm text-[var(--secondary)]">
+          {tiket.deskripsi}
+        </p>
       </section>
 
       {(tiket.poin_kesulitan != null || tiket.catatan_solusi) && (

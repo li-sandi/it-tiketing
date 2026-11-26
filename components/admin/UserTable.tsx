@@ -7,7 +7,7 @@ type User = {
   id: string;
   nama: string;
   email: string;
-  peran: "user" | "it" | "admin";
+  peran: "user" | "it" | "admin" | "ga";
   site_id: string | null;
 };
 
@@ -92,6 +92,7 @@ export default function UserTable({
                   >
                     <option value="user">User</option>
                     <option value="it">IT</option>
+                    <option value="ga">GA</option>
                     <option value="admin">Admin</option>
                   </select>
                 </td>

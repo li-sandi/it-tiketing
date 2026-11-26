@@ -1,4 +1,4 @@
-name: SLA check
+name: SLA and Auto-Close Check
 
 on:
   schedule:
@@ -8,11 +8,11 @@ on:
 permissions: {}
 
 jobs:
-  sla-check:
+  sla-and-autoclose:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Call production SLA endpoint
+      - name: Call production SLA & Auto-Close endpoints
         env:
           CRON_BASE_URL: ${{ vars.CRON_BASE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
@@ -32,3 +32,7 @@ jobs:
           curl --fail-with-body --silent --show-error --max-time 150 \
             --header "x-cron-secret: ${CRON_SECRET}" \
             "${CRON_BASE_URL}/api/cron/sla-check"
+
+          curl --fail-with-body --silent --show-error --max-time 150 \
+            --header "x-cron-secret: ${CRON_SECRET}" \
+            "${CRON_BASE_URL}/api/cron/auto-close"

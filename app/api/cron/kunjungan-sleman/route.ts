@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { cekCronSecret } from "@/lib/cron-auth";
-import { kirimPengingatKunjungan } from "@/lib/sleman";
+import {
+  cekJadwalSlemanHampirHabis,
+  kirimPengingatKunjungan,
+} from "@/lib/sleman";
 
 export async function GET(request: Request) {
   if (!cekCronSecret(request)) {
@@ -8,8 +11,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await kirimPengingatKunjungan();
-    return NextResponse.json({ ok: true, ...result });
+    const [reminder, expiry] = await Promise.all([
+      kirimPengingatKunjungan(),
+      cekJadwalSlemanHampirHabis(),
+    ]);
+    return NextResponse.json({ ok: true, ...reminder, expiry });
   } catch (error) {
     console.error(
       "Cron kunjungan Sleman gagal:",

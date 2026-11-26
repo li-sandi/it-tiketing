@@ -50,8 +50,15 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
 
   const admin = createAdminClient();
-  let ticketIds: string[];
 
+  // Check asset registry first (for static IDs and RAM capacity)
+  const { data: assetRecord } = await admin
+    .from("assets")
+    .select("nama_perangkat, ram_gb, anydesk_id, uv_id")
+    .ilike("nomor_aset", assetNumber)
+    .maybeSingle();
+
+  let ticketIds: string[];
   if (user) {
     const { data: profile, error: profileError } = await supabase
       .from("users")
@@ -80,61 +87,68 @@ export async function POST(request: Request) {
     }
     ticketIds = (tickets ?? []).map((ticket) => ticket.id);
   } else {
-    if (!UUID_PATTERN.test(accessToken)) {
+    if (!UUID_PATTERN.test(accessToken) && !assetRecord) {
       return jsonError(
         "Login atau tiket publik sebelumnya diperlukan untuk mencari ID.",
         401,
       );
     }
 
-    const { data: ticket, error: ticketError } = await admin
-      .from("tickets")
-      .select("id")
-      .eq("akses_token", accessToken)
-      .eq("nomor_aset", assetNumber)
-      .is("pembuat_id", null)
-      .maybeSingle();
-    if (ticketError) {
-      console.error("Gagal memvalidasi token tiket untuk pencarian ID:", ticketError.message);
-      return jsonError("Gagal memeriksa akses tiket.", 500);
+    if (UUID_PATTERN.test(accessToken)) {
+      const { data: ticket, error: ticketError } = await admin
+        .from("tickets")
+        .select("id")
+        .eq("akses_token", accessToken)
+        .eq("nomor_aset", assetNumber)
+        .is("pembuat_id", null)
+        .maybeSingle();
+      if (ticketError) {
+        console.error("Gagal memvalidasi token tiket:", ticketError.message);
+        return jsonError("Gagal memeriksa akses tiket.", 500);
+      }
+      ticketIds = ticket ? [ticket.id] : [];
+    } else {
+      ticketIds = [];
     }
-    ticketIds = ticket ? [ticket.id] : [];
   }
 
-  if (!ticketIds.length) {
-    return NextResponse.json(
-      { anydeskId: null, uvId: null },
-      { headers: PRIVATE_HEADERS },
-    );
-  }
-
-  const { data: credentials, error: credentialError } = await admin
-    .from("remote_credentials")
-    .select("ticket_id, aplikasi, remote_id")
-    .in("ticket_id", ticketIds);
-  if (credentialError) {
-    console.error("Gagal membaca ID remote berdasarkan aset:", credentialError.message);
-    return jsonError("Gagal mencari ID remote untuk aset.", 500);
-  }
-
-  const ticketOrder = new Map(ticketIds.map((id, index) => [id, index]));
-  const newestFirst = [...(credentials ?? [])].sort(
-    (left, right) =>
-      (ticketOrder.get(left.ticket_id) ?? Number.MAX_SAFE_INTEGER) -
-      (ticketOrder.get(right.ticket_id) ?? Number.MAX_SAFE_INTEGER),
-  );
-  const ids: { anydeskId: string | null; uvId: string | null } = {
-    anydeskId: null,
-    uvId: null,
+  const ids: {
+    anydeskId: string | null;
+    uvId: string | null;
+    ramGb: number | null;
+    assetName: string | null;
+  } = {
+    anydeskId: assetRecord?.anydesk_id ?? null,
+    uvId: assetRecord?.uv_id ?? null,
+    ramGb: assetRecord?.ram_gb ?? null,
+    assetName: assetRecord?.nama_perangkat ?? null,
   };
-  for (const credential of newestFirst) {
-    if (credential.aplikasi === "anydesk" && !ids.anydeskId) {
-      ids.anydeskId = credential.remote_id;
+
+  if (ticketIds.length && (!ids.anydeskId || !ids.uvId)) {
+    const { data: credentials, error: credentialError } = await admin
+      .from("remote_credentials")
+      .select("ticket_id, aplikasi, remote_id")
+      .in("ticket_id", ticketIds);
+    if (credentialError) {
+      console.error("Gagal membaca ID remote:", credentialError.message);
+      return jsonError("Gagal mencari ID remote untuk aset.", 500);
     }
-    if (credential.aplikasi === "uv" && !ids.uvId) {
-      ids.uvId = credential.remote_id;
+
+    const ticketOrder = new Map(ticketIds.map((id, index) => [id, index]));
+    const newestFirst = [...(credentials ?? [])].sort(
+      (left, right) =>
+        (ticketOrder.get(left.ticket_id) ?? Number.MAX_SAFE_INTEGER) -
+        (ticketOrder.get(right.ticket_id) ?? Number.MAX_SAFE_INTEGER),
+    );
+    for (const credential of newestFirst) {
+      if (credential.aplikasi === "anydesk" && !ids.anydeskId && credential.remote_id !== "-") {
+        ids.anydeskId = credential.remote_id;
+      }
+      if (credential.aplikasi === "uv" && !ids.uvId && credential.remote_id !== "-") {
+        ids.uvId = credential.remote_id;
+      }
+      if (ids.anydeskId && ids.uvId) break;
     }
-    if (ids.anydeskId && ids.uvId) break;
   }
 
   return NextResponse.json(ids, { headers: PRIVATE_HEADERS });

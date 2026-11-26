@@ -1,20 +1,18 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { parseAturanKenaikan, type Prioritas } from "@/lib/prioritas";
+import CategoryGroupSelector, {
+  type CategoryOption,
+} from "@/components/tiket/CategoryGroupSelector";
 import RemoteCredentialFields from "@/components/tiket/RemoteCredentialFields";
-
-type Category = {
-  id: string;
-  nama: string;
-  tipe: "insiden" | "permintaan" | "internal";
-  prioritas_default: Prioritas;
-  prioritas_naik: unknown;
-  butuh_aset: boolean;
-  butuh_foto: boolean;
-  bisa_remote: boolean;
-};
+import SelfCheckPanel from "@/components/tiket/SelfCheckPanel";
+import { parseAturanKenaikan } from "@/lib/prioritas";
+import {
+  formatProcurementEstimate,
+  resolveInitialTicketStockState,
+  type InventoryStockItem,
+} from "@/lib/stok";
 
 type Site = { id: string; nama: string; jumlah_user: number };
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -23,14 +21,17 @@ const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 export default function PublicTicketForm({
   categories,
   sites,
+  stocks = [],
 }: {
-  categories: Category[];
+  categories: CategoryOption[];
   sites: Site[];
+  stocks?: InventoryStockItem[];
 }) {
   const router = useRouter();
+  const singleSite = sites.length === 1 ? sites[0] : null;
   const [nama, setNama] = useState("");
   const [kontak, setKontak] = useState("");
-  const [siteId, setSiteId] = useState("");
+  const [siteId, setSiteId] = useState(singleSite?.id ?? "");
   const [categoryId, setCategoryId] = useState("");
   const [deskripsi, setDeskripsi] = useState("");
   const [jumlahUser, setJumlahUser] = useState("");
@@ -38,8 +39,16 @@ export default function PublicTicketForm({
   const [nomorAset, setNomorAset] = useState("");
   const [penanganan, setPenanganan] = useState<"onsite" | "remote">("onsite");
   const [anydeskId, setAnydeskId] = useState("");
+  const [anydeskPassword, setAnydeskPassword] = useState("");
   const [uvId, setUvId] = useState("");
+  const [uvPassword, setUvPassword] = useState("");
+  const [remoteFile, setRemoteFile] = useState<File | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [ramWarning, setRamWarning] = useState<{
+    ramGb: number;
+    assetName: string | null;
+  } | null>(null);
+  const [requestUpgradeRam, setRequestUpgradeRam] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,8 +57,26 @@ export default function PublicTicketForm({
   const needsAffectedUsers =
     rule?.tipe === "persen_site" ||
     rule?.tipe === "jumlah_user" ||
-    ["Internet lambat", "Masalah VPN"].includes(category?.nama ?? "");
+    (category?.nama ?? "").startsWith("Internet lambat") ||
+    (category?.nama ?? "").startsWith("Masalah VPN");
   const needsTaskCount = rule?.tipe === "jumlah_task";
+  const stocksByKode = Object.fromEntries(stocks.map((s) => [s.kode, s]));
+  const stockCheck = resolveInitialTicketStockState(
+    category?.stock_kode,
+    stocksByKode,
+  );
+
+  const handleAssetDetected = useCallback(
+    (info: { ramGb: number | null; assetName: string | null }) => {
+      if (info.ramGb !== null && info.ramGb <= 4) {
+        setRamWarning({ ramGb: info.ramGb, assetName: info.assetName });
+      } else {
+        setRamWarning(null);
+        setRequestUpgradeRam(false);
+      }
+    },
+    [],
+  );
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -94,8 +121,12 @@ export default function PublicTicketForm({
     formData.set("jumlahTask", jumlahTask);
     formData.set("nomorAset", nomorAset);
     formData.set("anydeskId", anydeskId);
+    formData.set("anydeskPassword", anydeskPassword);
     formData.set("uvId", uvId);
+    formData.set("uvPassword", uvPassword);
+    formData.set("rekomendasiUpgradeRam", String(requestUpgradeRam));
     if (file) formData.set("file", file);
+    if (remoteFile) formData.set("remoteFile", remoteFile);
 
     try {
       const response = await fetch("/api/tiket/publik", {
@@ -114,15 +145,13 @@ export default function PublicTicketForm({
       if (result.warnings?.length) {
         console.error("Tiket dibuat dengan peringatan:", result.warnings);
       }
-      if (result.kunjungan) {
-        console.info(
-          `Tiket diarahkan ke kunjungan ${result.kunjungan.tanggalLabel}.`,
-        );
-      }
       try {
         window.localStorage.setItem("public-ticket-access-token", result.token);
       } catch (storageError) {
-        console.warn("Token tiket publik tidak dapat disimpan untuk auto-fill:", storageError);
+        console.warn(
+          "Token tiket publik tidak dapat disimpan untuk auto-fill:",
+          storageError,
+        );
       }
       router.push(`/status/${result.token}`);
     } catch (submitError) {
@@ -154,7 +183,7 @@ export default function PublicTicketForm({
 
       <div>
         <label htmlFor="public-contact" className="mb-1 block text-sm font-medium">
-          Kontak (opsional)
+          Kontak / Email (opsional)
         </label>
         <input
           id="public-contact"
@@ -162,58 +191,87 @@ export default function PublicTicketForm({
           onChange={(event) => setKontak(event.target.value)}
           maxLength={200}
           autoComplete="email"
+          placeholder="No. HP / Email untuk notifikasi"
           className="w-full rounded border px-3 py-2"
         />
       </div>
 
-      <div>
-        <label htmlFor="public-site" className="mb-1 block text-sm font-medium">
-          Site
-        </label>
-        <select
-          id="public-site"
-          value={siteId}
-          onChange={(event) => setSiteId(event.target.value)}
-          required
-          className="w-full rounded border px-3 py-2"
-        >
-          <option value="">— pilih site —</option>
-          {sites.map((site) => (
-            <option key={site.id} value={site.id}>
-              {site.nama}
-            </option>
-          ))}
-        </select>
-      </div>
+      {singleSite ? (
+        <div className="rounded border bg-gray-50 px-3 py-2 text-sm">
+          Site aktif: <strong>{singleSite.nama}</strong>
+        </div>
+      ) : (
+        <div>
+          <label htmlFor="public-site" className="mb-1 block text-sm font-medium">
+            Site
+          </label>
+          <select
+            id="public-site"
+            value={siteId}
+            onChange={(event) => setSiteId(event.target.value)}
+            required
+            className="w-full rounded border px-3 py-2"
+          >
+            <option value="">— pilih site —</option>
+            {sites.map((site) => (
+              <option key={site.id} value={site.id}>
+                {site.nama}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
-      <div>
-        <label htmlFor="public-category" className="mb-1 block text-sm font-medium">
-          Kategori
-        </label>
-        <select
-          id="public-category"
-          value={categoryId}
-          onChange={(event) => {
-            setCategoryId(event.target.value);
-            setJumlahUser("");
-            setJumlahTask("");
-            setNomorAset("");
-            setFile(null);
-            setPenanganan("onsite");
-            setAnydeskId("");
-            setUvId("");
-          }}
-          required
-          className="w-full rounded border px-3 py-2"
+      <CategoryGroupSelector
+        categories={categories}
+        selectedCategoryId={categoryId}
+        selectId="public-category"
+        onSelectCategory={(nextId) => {
+          setCategoryId(nextId);
+          setJumlahUser("");
+          setJumlahTask("");
+          setNomorAset("");
+          setFile(null);
+          setPenanganan("onsite");
+          setAnydeskId("");
+          setAnydeskPassword("");
+          setUvId("");
+          setUvPassword("");
+          setRemoteFile(null);
+        }}
+      />
+
+      {category?.stock_kode && (
+        <div
+          className={`rounded-xl border p-3.5 text-sm ${
+            stockCheck.needsProcurement
+              ? "border-amber-300 bg-amber-50 text-amber-950"
+              : "border-emerald-300 bg-emerald-50 text-emerald-950"
+          }`}
         >
-          <option value="">— pilih kategori —</option>
-          {categories.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.nama} ({item.prioritas_default})
-            </option>
-          ))}
-        </select>
-      </div>
+          {stockCheck.needsProcurement ? (
+            <>
+              <p className="font-semibold">
+                Stok {stockCheck.stockNama} sedang kosong (0 unit)
+              </p>
+              <p className="mt-0.5 text-xs">
+                Tiket tetap dicatat dan otomatis berstatus{" "}
+                <strong>Menunggu Pengadaan</strong> dengan estimasi{" "}
+                <strong>
+                  {formatProcurementEstimate(stockCheck.estimasiPengadaan) ??
+                    "bulan depan"}
+                </strong>{" "}
+                (menunggu pembelian GA/Admin bulan depan).
+              </p>
+            </>
+          ) : (
+            <p className="text-xs font-semibold">
+              Stok {stockCheck.stockNama} tersedia ({stockCheck.availableCount}{" "}
+              unit) - IT dapat segera menindaklanjuti setelah tiket masuk.
+            </p>
+          )}
+        </div>
+      )}
 
       <div>
         <label htmlFor="public-description" className="mb-1 block text-sm font-medium">
@@ -230,6 +288,12 @@ export default function PublicTicketForm({
           className="w-full rounded border px-3 py-2"
         />
       </div>
+
+      <SelfCheckPanel
+        categoryId={categoryId}
+        grup={category?.grup}
+        deskripsi={deskripsi}
+      />
 
       {needsAffectedUsers && (
         <div>
@@ -286,10 +350,27 @@ export default function PublicTicketForm({
         </div>
       )}
 
+      {ramWarning && (
+        <div className="rounded border border-yellow-200 bg-yellow-50 p-3 text-sm">
+          <p className="font-medium text-yellow-800">
+            Perangkat {ramWarning.assetName ?? nomorAset} terdeteksi memiliki RAM{" "}
+            {ramWarning.ramGb} GB.
+          </p>
+          <label className="mt-2 flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={requestUpgradeRam}
+              onChange={(e) => setRequestUpgradeRam(e.target.checked)}
+            />
+            Ajukan rekomendasi Upgrade RAM ke GA/Admin sekaligus
+          </label>
+        </div>
+      )}
+
       {category?.butuh_foto && (
         <div>
           <label htmlFor="public-photo" className="mb-1 block text-sm font-medium">
-            Foto / screenshot (wajib, maksimal 5 MB)
+            Foto / screenshot masalah (wajib, maksimal 5 MB)
           </label>
           <input
             key={categoryId}
@@ -337,9 +418,16 @@ export default function PublicTicketForm({
       <RemoteCredentialFields
         assetNumber={nomorAset}
         anydeskId={anydeskId}
+        anydeskPassword={anydeskPassword}
         uvId={uvId}
+        uvPassword={uvPassword}
+        remoteFile={remoteFile}
         onAnydeskIdChange={setAnydeskId}
+        onAnydeskPasswordChange={setAnydeskPassword}
         onUvIdChange={setUvId}
+        onUvPasswordChange={setUvPassword}
+        onRemoteFileChange={setRemoteFile}
+        onAssetDetected={handleAssetDetected}
       />
 
       {error && (

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import PublicHeader from "@/components/layout/PublicHeader";
 import PublicTicketStatus from "@/components/tiket/PublicTicketStatus";
 
 export const instant = false;
@@ -12,5 +13,10 @@ export default async function PublicTicketStatusPage({
   const { token } = await params;
   if (!UUID_PATTERN.test(token)) notFound();
 
-  return <PublicTicketStatus token={token} />;
+  return (
+    <div className="flex min-h-screen flex-col bg-[var(--background)]">
+      <PublicHeader />
+      <PublicTicketStatus token={token} />
+    </div>
+  );
 }

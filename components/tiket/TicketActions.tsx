@@ -64,16 +64,18 @@ export default function TicketActions({
 
   return (
     <section className="space-y-3">
-      {isStaff && status === "baru" && !assigneeId && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void runAction(() => claimTicket(ticketId))}
-          className="rounded bg-black px-4 py-2 text-white hover:bg-gray-800 disabled:opacity-50"
-        >
-          {busy ? "Mengambil..." : "Ambil tiket"}
-        </button>
-      )}
+      {isStaff &&
+        (status === "baru" || status === "menunggu_pengadaan") &&
+        !assigneeId && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void runAction(() => claimTicket(ticketId))}
+            className="rounded bg-black px-4 py-2 text-white hover:bg-gray-800 disabled:opacity-50"
+          >
+            {busy ? "Mengambil..." : "Ambil tiket"}
+          </button>
+        )}
 
       {status === "ditutup" && (
         <p className="text-sm text-gray-500">Tiket sudah ditutup.</p>
