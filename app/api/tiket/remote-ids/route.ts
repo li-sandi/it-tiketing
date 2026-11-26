@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { checkEndpointRateLimit } from "@/lib/rate-limit";
+import { sanitizeRemoteLookupResult } from "@/lib/remote-id-policy";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -8,6 +10,12 @@ const PRIVATE_HEADERS = { "Cache-Control": "no-store, private" };
 
 function jsonError(error: string, status: number) {
   return NextResponse.json({ error }, { status, headers: PRIVATE_HEADERS });
+}
+
+function getClientIp(request: Request) {
+  const xff = request.headers.get("x-forwarded-for");
+  if (xff) return xff.split(",")[0]?.trim() || "unknown";
+  return request.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
 export async function POST(request: Request) {
@@ -20,6 +28,16 @@ export async function POST(request: Request) {
     } catch {
       return jsonError("Header asal permintaan tidak valid.", 403);
     }
+  }
+
+  const rateLimit = await checkEndpointRateLimit({
+    ip: getClientIp(request),
+    bucket: "remote-ids",
+    limit: 30,
+    windowMinutes: 15,
+  });
+  if (!rateLimit.success) {
+    return jsonError("Terlalu banyak percobaan pencarian aset. Coba lagi nanti.", 429);
   }
 
   let payload: unknown;
@@ -50,15 +68,15 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
 
   const admin = createAdminClient();
-
-  // Check asset registry first (for static IDs and RAM capacity)
   const { data: assetRecord } = await admin
     .from("assets")
     .select("nama_perangkat, ram_gb, anydesk_id, uv_id")
     .ilike("nomor_aset", assetNumber)
     .maybeSingle();
 
-  let ticketIds: string[];
+  let ticketIds: string[] = [];
+  let canReadRemoteIds = false;
+
   if (user) {
     const { data: profile, error: profileError } = await supabase
       .from("users")
@@ -70,13 +88,18 @@ export async function POST(request: Request) {
       return jsonError("Gagal memeriksa akses.", 500);
     }
 
+    const isPrivileged =
+      profile?.peran === "it" ||
+      profile?.peran === "admin" ||
+      profile?.peran === "ga";
+
     let ticketsQuery = admin
       .from("tickets")
       .select("id")
       .eq("nomor_aset", assetNumber)
       .order("dibuat_pada", { ascending: false })
       .limit(50);
-    if (profile?.peran !== "it" && profile?.peran !== "admin") {
+    if (!isPrivileged) {
       ticketsQuery = ticketsQuery.eq("pembuat_id", user.id);
     }
 
@@ -86,6 +109,7 @@ export async function POST(request: Request) {
       return jsonError("Gagal mencari ID remote untuk aset.", 500);
     }
     ticketIds = (tickets ?? []).map((ticket) => ticket.id);
+    canReadRemoteIds = isPrivileged || ticketIds.length > 0;
   } else {
     if (!UUID_PATTERN.test(accessToken) && !assetRecord) {
       return jsonError(
@@ -106,25 +130,15 @@ export async function POST(request: Request) {
         console.error("Gagal memvalidasi token tiket:", ticketError.message);
         return jsonError("Gagal memeriksa akses tiket.", 500);
       }
-      ticketIds = ticket ? [ticket.id] : [];
-    } else {
-      ticketIds = [];
+      if (ticket) {
+        ticketIds = [ticket.id];
+        canReadRemoteIds = true;
+      }
     }
   }
 
-  const ids: {
-    anydeskId: string | null;
-    uvId: string | null;
-    ramGb: number | null;
-    assetName: string | null;
-  } = {
-    anydeskId: assetRecord?.anydesk_id ?? null,
-    uvId: assetRecord?.uv_id ?? null,
-    ramGb: assetRecord?.ram_gb ?? null,
-    assetName: assetRecord?.nama_perangkat ?? null,
-  };
-
-  if (ticketIds.length && (!ids.anydeskId || !ids.uvId)) {
+  let ticketCreds: Array<{ ticket_id: string; aplikasi: string; remote_id: string }> = [];
+  if (canReadRemoteIds && ticketIds.length > 0) {
     const { data: credentials, error: credentialError } = await admin
       .from("remote_credentials")
       .select("ticket_id, aplikasi, remote_id")
@@ -133,23 +147,15 @@ export async function POST(request: Request) {
       console.error("Gagal membaca ID remote:", credentialError.message);
       return jsonError("Gagal mencari ID remote untuk aset.", 500);
     }
-
-    const ticketOrder = new Map(ticketIds.map((id, index) => [id, index]));
-    const newestFirst = [...(credentials ?? [])].sort(
-      (left, right) =>
-        (ticketOrder.get(left.ticket_id) ?? Number.MAX_SAFE_INTEGER) -
-        (ticketOrder.get(right.ticket_id) ?? Number.MAX_SAFE_INTEGER),
-    );
-    for (const credential of newestFirst) {
-      if (credential.aplikasi === "anydesk" && !ids.anydeskId && credential.remote_id !== "-") {
-        ids.anydeskId = credential.remote_id;
-      }
-      if (credential.aplikasi === "uv" && !ids.uvId && credential.remote_id !== "-") {
-        ids.uvId = credential.remote_id;
-      }
-      if (ids.anydeskId && ids.uvId) break;
-    }
+    ticketCreds = credentials ?? [];
   }
 
-  return NextResponse.json(ids, { headers: PRIVATE_HEADERS });
+  const sanitized = sanitizeRemoteLookupResult({
+    assetRecord,
+    ticketIds,
+    ticketCreds,
+    canReadRemoteIds,
+  });
+
+  return NextResponse.json(sanitized, { headers: PRIVATE_HEADERS });
 }

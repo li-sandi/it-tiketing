@@ -1,11 +1,15 @@
 import Link from "next/link";
+import { connection } from "next/server";
+import { getFeatureFlags } from "@/lib/settings";
+
+export const instant = false;
 
 const adminSections = [
   {
     href: "/admin/kategori",
     title: "Kelola Kategori",
     description:
-      "Tambah, kelompokkan, dan atur prioritas serta syarat formulir tiap kategori.",
+      "Tambah, kelompokkan, hubungkan stok sparepart, dan atur prioritas tiap kategori.",
   },
   {
     href: "/admin/sites",
@@ -22,7 +26,7 @@ const adminSections = [
     href: "/aset",
     title: "Inventaris Aset",
     description:
-      "Kelola nomor aset perangkat, kapasitas RAM, serta ID AnyDesk/UV statis.",
+      "Kelola nomor aset perangkat, kapasitas RAM, import CSV, serta ID AnyDesk/UV statis.",
   },
   {
     href: "/stok",
@@ -37,18 +41,31 @@ const adminSections = [
       "Atur tanggal libur hari kerja P3, batas rate limit, feature flag, dan laporan mingguan.",
   },
   {
+    href: "/admin/audit",
+    title: "Audit Log",
+    description:
+      "Pantau riwayat perubahan kategori, site, peran pengguna, dan pengaturan sistem.",
+  },
+  {
     href: "/admin/jadwal",
     title: "Jadwal Kunjungan",
     description:
       "Kelola jadwal kunjungan dinamis saat routing multi-site diaktifkan.",
+    requiresSlemanFlag: true,
   },
 ];
 
-export default function AdminPage() {
+export default async function AdminPage() {
+  await connection();
+  const flags = await getFeatureFlags();
+  const visibleSections = adminSections.filter(
+    (s) => !s.requiresSlemanFlag || flags.sleman_routing_enabled,
+  );
+
   return (
     <section className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {adminSections.map((section) => (
+        {visibleSections.map((section) => (
           <Link
             key={section.href}
             href={section.href}

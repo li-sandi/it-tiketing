@@ -38,7 +38,7 @@ const statusStyles: Record<TicketStatus, { badge: string; dot: string }> = {
 const priorityColors: Record<string, string> = {
   P0: "bg-red-700 text-white border border-red-800",
   P1: "bg-orange-700 text-white border border-orange-800",
-  P2: "bg-amber-100 text-amber-900 border border-amber-300",
+  P2: "bg-blue-100 text-blue-800 border border-blue-300",
   P3: "bg-slate-100 text-slate-800 border border-slate-300",
 };
 

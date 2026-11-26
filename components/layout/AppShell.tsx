@@ -44,6 +44,7 @@ const ADMIN_NAV: NavItem[] = [
   { href: "/admin/users", label: "Pengguna", roles: ["admin"], icon: "shield" },
   { href: "/admin/jadwal", label: "Jadwal", roles: ["admin"], icon: "shield" },
   { href: "/admin/pengaturan", label: "Pengaturan", roles: ["admin"], icon: "shield" },
+  { href: "/admin/audit", label: "Audit Log", roles: ["admin"], icon: "shield" },
 ];
 
 function NavIcon({ name }: { name: NavItem["icon"] }) {
@@ -121,6 +122,7 @@ export default function AppShell({
   pageTitle,
   pageSubtitle,
   headerAction,
+  showSchedule = false,
   children,
 }: {
   userName: string;
@@ -129,6 +131,7 @@ export default function AppShell({
   pageTitle: string;
   pageSubtitle?: string;
   headerAction?: ReactNode;
+  showSchedule?: boolean;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -163,6 +166,7 @@ export default function AppShell({
   }
 
   function isVisible(item: NavItem) {
+    if (item.href === "/admin/jadwal" && !showSchedule) return false;
     return !item.roles || item.roles.includes(role);
   }
 

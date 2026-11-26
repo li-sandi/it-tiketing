@@ -515,6 +515,7 @@ export default async function TicketDetailPage({
           </p>
           <SlaTimer
             label="SLA Respons"
+            mulai={ticket.dibuat_pada}
             batas={ticket.sla_respon_batas}
             berhenti={["diproses", "selesai", "ditutup"].includes(status)}
           />
@@ -523,6 +524,7 @@ export default async function TicketDetailPage({
           </p>
           <SlaTimer
             label="SLA Resolusi"
+            mulai={ticket.diproses_pada ?? ticket.dibuat_pada}
             batas={ticket.sla_resolusi_batas}
             berhenti={[
               "selesai",

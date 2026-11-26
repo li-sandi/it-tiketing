@@ -4,6 +4,31 @@ Seluruh perubahan signifikan pada proyek **IT Ticketing** dicatat pada berkas in
 
 ---
 
+## [2026-11-26] — Penguatan Keamanan, Audit Admin, Peningkatan UX, & CI
+
+### Ditambahkan & Diubah (Added & Changed)
+- **Keamanan & Privasi Kredensial Remote:**
+  - `lib/remote-id-policy.ts` (`sanitizeRemoteLookupResult`) & `lib/__tests__/remote-ids-privacy.test.ts` — mencegah kebocoran ID statis AnyDesk/UltraViewer untuk pemanggil anonim atau pengguna non-pemilik pada `POST /api/tiket/remote-ids`, sambil mempertahankan metadata non-sensitif (`ramGb`, `assetName`, `hasSavedRemoteId`).
+  - Pembatasan rate limit per endpoint (`checkEndpointRateLimit` di `lib/rate-limit.ts`) untuk `POST /api/tiket/remote-ids` (30/15 menit) dan `GET /api/aset/lookup` (60/15 menit), serta pembatasan akses `GET /api/aset/lookup` khusus staf terautentikasi (`it`, `admin`, `ga`).
+  - Penautan ID statis AnyDesk/UltraViewer otomatis di sisi server (`app/api/tiket/publik/route.ts`, `app/api/tiket/remote-credentials/route.ts`) berdasarkan `nomorAset` dan `RemoteCredentialFields.tsx`.
+- **Audit Log Admin & Kontrol Menu Jadwal:**
+  - `supabase/migrations/0031_admin_audit_logs.sql` (sudah diterapkan ke Supabase live `nfpepubznnrmbrutnywl`) — tabel `admin_audit_logs` beserta kebijakan RLS khusus admin.
+  - `lib/admin-audit.ts` (`logAdminAction`), halaman `/admin/audit` (`app/admin/audit/page.tsx`), serta pencatatan audit pada endpoint `/api/admin/kategori`, `/api/admin/sites`, `/api/admin/users/[id]`, dan `/api/admin/settings`.
+  - Menu & akses `/admin/jadwal` disembunyikan secara default dan mengikuti flag `feature_flags.sleman_routing_enabled` di `AppShell.tsx`, `app/admin/layout.tsx`, dan `app/admin/page.tsx`.
+- **UX Antrian, SLA, Feedback, & Skeleton Loading:**
+  - `StatusBadge.tsx` — pembeda warna biru untuk prioritas `P2`.
+  - `TicketBoardClient.tsx` — tabel interaktif desktop (pencarian, filter status/prioritas, pengurutan kolom) dan daftar kartu responsif untuk `/antrian` dan `/tiket`.
+  - `SlaTimer.tsx` — bilah progres visual SLA pada `/tiket/[id]`.
+  - `PriorityPreviewBanner.tsx` — pratinjau prioritas & target SLA langsung di `PublicTicketForm` dan `TicketForm`.
+  - `app/page.tsx` — penambahan informasi jam layanan IT & cakupan bantuan di beranda.
+  - `ToastProvider.tsx` & `ConfirmDialog.tsx` — notifikasi toast global di `app/layout.tsx` serta dialog konfirmasi aksesibel pada `RemoteCredentialPanel`, `UserRatingForm`, `MergeTicketPanel`, dan feedback toast pada `TicketActions`.
+  - Skeleton pemuatan (`loading.tsx`) pada `/dashboard`, `/antrian`, `/tiket`, `/stok`, dan `/laporan`.
+- **DevOps, CI, & Verifikasi Database:**
+  - `.github/workflows/ci.yml` — workflow CI otomatis (`npm run test`, `npm run lint`, `npx tsc --noEmit`, `npm run build` pada Node 22).
+  - `scripts/verify-rls.sql` — kueri verifikasi status RLS dan jumlah policy 12 tabel inti.
+
+---
+
 ## [2026-11-26] — Pembaruan Desain Antarmuka Corporate Service Desk
 
 ### Ditambahkan & Diubah (Added & Changed)

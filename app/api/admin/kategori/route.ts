@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logAdminAction } from "@/lib/admin-audit";
 import { getAdminUser } from "@/lib/admin-auth";
 import { parseAturanKenaikan } from "@/lib/prioritas";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -107,6 +108,15 @@ export async function POST(request: Request) {
     console.error("Gagal menambah kategori:", error.message);
     return jsonError("Gagal menambah kategori.", 500);
   }
+
+  await logAdminAction({
+    aktorId: adminUser.user.id,
+    aksi: "create",
+    entitas: "kategori",
+    entitasId: data.id,
+    ringkasan: `Menambah kategori "${nama}" (${grup}, ${prioritasDefault})`,
+    detail: { nama, grup, tipe, prioritas_default: prioritasDefault, stock_kode: stockKode },
+  });
 
   return NextResponse.json(
     { ok: true, category: data },

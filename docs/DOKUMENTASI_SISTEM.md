@@ -48,8 +48,12 @@ Pelapor memilih **Kelompok Kategori** (`Network & VPN`, `Hardware & Periferal`, 
 - **Auto-Close Sesuai Target SLA (`auto_close_due_tickets`):** Tiket `selesai` yang belum dikonfirmasi pelapor ditutup otomatis sesuai SLA resolusi masing-masing prioritas, membersihkan foto remote (`foto_remote`), dan mengirim notifikasi `auto_close`.
 
 ### 3.3 Kredensial Remote (AnyDesk & UltraViewer)
-- **ID Statis (`anydesk_id`, `uv_id`):** Diisi otomatis berdasarkan `nomor_aset` dari tabel `assets` atau tiket sebelumnya.
+- **ID Statis (`anydesk_id`, `uv_id`):** Diisi otomatis di sisi server (`POST /api/tiket/publik`, `POST /api/tiket/remote-credentials`) berdasarkan `nomor_aset` dari tabel `assets`. Pemanggil anonim pada `POST /api/tiket/remote-ids` hanya menerima status ketersediaan (`hasSavedRemoteId`) tanpa membuka ID statis, sedangkan `GET /api/aset/lookup` hanya terbuka untuk staf `it`/`admin`/`ga`.
 - **Password Sementara & Foto Layar Remote:** Password AnyDesk/UltraViewer dienkripsi dengan AES-256-GCM (`REMOTE_CREDENTIAL_ENCRYPTION_KEY`) sebelum disimpan, kedaluwarsa dalam 24 jam, dan otomatis dihapus (`null`) saat tiket berstatus `selesai` atau `ditutup`. Foto layar remote (`jenis = 'foto_remote'`) hanya dapat diakses pembuat tiket, IT pemegang tiket, dan Admin melalui `/api/tiket/[id]/remote-reveal` (mencatat event `kredensial_dilihat`) dan terhapus otomatis dari storage saat tiket selesai/ditutup.
+
+### 3.4 Audit Admin & Penjadwalan Multi-Site
+- Perubahan kategori, site, peran user, dan pengaturan sistem dicatat ke tabel `admin_audit_logs` (`0031_admin_audit_logs.sql`) dan dapat ditinjau di `/admin/audit`.
+- Menu `/admin/jadwal` otomatis disembunyikan selama `feature_flags.sleman_routing_enabled = false`.
 
 ---
 
@@ -58,8 +62,8 @@ Pelapor memilih **Kelompok Kategori** (`Network & VPN`, `Hardware & Periferal`, 
 | Metode & Path | Akses | Fungsi |
 |---|---|---|
 | `POST /api/tiket/publik` | Publik (rate limit 20 umum / 100 P0 darurat per 15 menit) | Pembuatan tiket publik + enkripsi password + upload foto masalah & foto remote |
-| `POST /api/tiket/remote-ids` | Login / token tiket publik | Auto-fill ID AnyDesk/UV & deteksi RAM aset |
-| `POST /api/tiket/remote-credentials` | Login (pembuat tiket) | Simpan ID & password remote terenkripsi |
+| `POST /api/tiket/remote-ids` | Publik / Login / Token | Lookup RAM & nama perangkat aset; ID AnyDesk/UV hanya dikembalikan bagi staf, pemilik tiket, atau pemegang token valid (rate limit 30/15m) |
+| `POST /api/tiket/remote-credentials` | Login (pembuat tiket) | Simpan ID & password remote terenkripsi + auto-link aset |
 | `POST /api/tiket/[id]/remote-reveal` | IT pemegang tiket / Admin | Dekripsi password, URL bertanda tangan foto remote, catat audit `kredensial_dilihat` |
 | `POST /api/tiket/[id]/merge` | IT / Admin | Gabungkan tiket serupa ke tiket induk via RPC `merge_tickets` |
 | `POST /api/tiket/[id]/approval` | GA / Admin | Keputusan persetujuan (`disetujui` / `ditolak`) |
@@ -67,6 +71,7 @@ Pelapor memilih **Kelompok Kategori** (`Network & VPN`, `Hardware & Periferal`, 
 | `GET/POST /api/wiki`, `PATCH/DELETE /api/wiki/[id]` | Login (`GET`) / IT & Admin (tulis) | Pengelolaan Wiki / SOP |
 | `POST /api/wiki/self-check` | Publik / Login | Pencarian SOP & ringkasan RAG sebelum kirim tiket |
 | `GET/POST /api/aset`, `PATCH/DELETE /api/aset/[id]` | IT / Admin / GA | Inventaris aset & deteksi kandidat upgrade RAM ≤4 GB |
+| `GET /api/aset/lookup` | IT / Admin / GA | Pencarian cepat aset per nomor aset (rate limit 60/15m) |
 | `POST /api/aset/import` | IT / Admin / GA | Import massal data aset via CSV (maks. 500 baris per batch, upsert by `nomor_aset`) |
 | `GET/POST /api/stok`, `POST /api/stok/adjust` | GA / IT / Admin | Manajemen stok sparepart (`RAM`, `Headset`, `Mouse`, `Kabel Power`, `Charger Laptop`) & pencatatan mutasi |
 | `GET /api/laporan/export` | IT / Admin | Unduh CSV laporan tiket & SLA |
@@ -86,6 +91,8 @@ Pelapor memilih **Kelompok Kategori** (`Network & VPN`, `Hardware & Periferal`, 
 - **Unit test:** `npm run test` (Vitest pada `lib/__tests__/*.test.ts`)
 - **Lint & Typecheck:** `npm run lint && npx tsc --noEmit`
 - **Build:** `npm run build`
+- **Verifikasi RLS Database:** Jalankan [scripts/verify-rls.sql](../scripts/verify-rls.sql) pada SQL Editor Supabase untuk memverifikasi status RLS & policy 12 tabel inti.
+- **CI Otomatis:** `.github/workflows/ci.yml` menjalankan test, lint, typecheck, dan build pada setiap push/PR ke `main`.
 
 ---
 

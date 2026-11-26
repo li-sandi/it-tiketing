@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logAdminAction } from "@/lib/admin-audit";
 import { getAdminUser } from "@/lib/admin-auth";
 import { parseAturanKenaikan } from "@/lib/prioritas";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -143,6 +144,15 @@ export async function PATCH(
     console.error("Gagal mengubah kategori:", error.message);
     return jsonError("Gagal menyimpan perubahan kategori.", 500);
   }
+
+  await logAdminAction({
+    aktorId: adminUser.user.id,
+    aksi: "update",
+    entitas: "kategori",
+    entitasId: id,
+    ringkasan: `Memperbarui kategori ${id}: ${Object.keys(updates).join(", ")}`,
+    detail: updates,
+  });
 
   return NextResponse.json(
     { ok: true },

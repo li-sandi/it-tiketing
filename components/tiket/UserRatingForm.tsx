@@ -3,6 +3,8 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { tutupTiketOlehUser } from "@/app/tiket/[id]/actions";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/ToastProvider";
 
 export default function UserRatingForm({
   ticketId,
@@ -10,7 +12,9 @@ export default function UserRatingForm({
   ticketId: string;
 }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [rating, setRating] = useState(5);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -19,15 +23,22 @@ export default function UserRatingForm({
     event.preventDefault();
     setError(null);
     setNotice(null);
+    setConfirmOpen(true);
+  }
 
+  function executeClose() {
+    setConfirmOpen(false);
     startTransition(async () => {
       const result = await tutupTiketOlehUser(ticketId, rating);
       if (result.error) {
         setError(result.error);
+        toast(result.error, "error");
         return;
       }
 
-      setNotice(result.notice ?? "Tiket berhasil ditutup.");
+      const okMsg = result.notice ?? "Tiket berhasil ditutup.";
+      setNotice(okMsg);
+      toast(okMsg, "success");
       router.refresh();
     });
   }
@@ -37,6 +48,15 @@ export default function UserRatingForm({
       onSubmit={handleSubmit}
       className="space-y-4 rounded-xl border bg-[var(--surface-muted)] p-4"
     >
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Tutup Tiket Secara Permanen?"
+        message={`Tiket ini akan ditutup permanen dengan rating ${rating} dari 5 bintang. Pastikan kendala Anda sudah benar-benar selesai.`}
+        confirmLabel="Ya, Tutup Tiket"
+        busy={pending}
+        onConfirm={executeClose}
+        onCancel={() => setConfirmOpen(false)}
+      />
       <div>
         <h3 className="text-sm font-semibold text-[var(--foreground)]">
           Tiket sudah selesai. Beri rating layanan:

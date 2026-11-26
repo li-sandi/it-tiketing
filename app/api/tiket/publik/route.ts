@@ -363,24 +363,40 @@ export async function POST(request: Request) {
   const uploadedPaths: string[] = [];
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
+  let resolvedAnydeskId = anydeskId;
+  let resolvedUvId = uvId;
+  if (nomorAset && (!resolvedAnydeskId || !resolvedUvId)) {
+    const { data: registeredAsset } = await admin
+      .from("assets")
+      .select("anydesk_id, uv_id")
+      .ilike("nomor_aset", nomorAset)
+      .maybeSingle();
+    if (!resolvedAnydeskId && registeredAsset?.anydesk_id) {
+      resolvedAnydeskId = registeredAsset.anydesk_id;
+    }
+    if (!resolvedUvId && registeredAsset?.uv_id) {
+      resolvedUvId = registeredAsset.uv_id;
+    }
+  }
+
   const credentials = [
-    ...(anydeskId || encryptedAnydeskPass
+    ...(resolvedAnydeskId || encryptedAnydeskPass
       ? [
           {
             ticket_id: ticket.id,
             aplikasi: "anydesk",
-            remote_id: anydeskId || "-",
+            remote_id: resolvedAnydeskId || "-",
             password_terenkripsi: encryptedAnydeskPass,
             kedaluwarsa_pada: encryptedAnydeskPass ? expiresAt : null,
           },
         ]
       : []),
-    ...(uvId || encryptedUvPass
+    ...(resolvedUvId || encryptedUvPass
       ? [
           {
             ticket_id: ticket.id,
             aplikasi: "uv",
-            remote_id: uvId || "-",
+            remote_id: resolvedUvId || "-",
             password_terenkripsi: encryptedUvPass,
             kedaluwarsa_pada: encryptedUvPass ? expiresAt : null,
           },

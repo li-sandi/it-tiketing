@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type RevealedCred = {
   id: string;
@@ -24,6 +26,8 @@ export default function RemoteCredentialPanel({
   initialCount: number;
   remotePhotoCount: number;
 }) {
+  const { toast } = useToast();
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<RevealedCred[] | null>(null);
@@ -31,6 +35,7 @@ export default function RemoteCredentialPanel({
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   async function handleReveal() {
+    setConfirmOpen(false);
     setLoading(true);
     setError(null);
     try {
@@ -48,10 +53,12 @@ export default function RemoteCredentialPanel({
       }
       setCredentials(data.credentials ?? []);
       setPhotos(data.remotePhotos ?? []);
+      toast("Kredensial remote dibuka dan dicatat pada audit akses.", "info");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Gagal membuka kredensial remote.",
-      );
+      const message =
+        err instanceof Error ? err.message : "Gagal membuka kredensial remote.";
+      setError(message);
+      toast(message, "error");
     } finally {
       setLoading(false);
     }
@@ -61,14 +68,24 @@ export default function RemoteCredentialPanel({
     try {
       await navigator.clipboard.writeText(value);
       setCopiedId(id);
+      toast("Disalin ke clipboard.", "success");
       setTimeout(() => setCopiedId(null), 1500);
     } catch {
-      // Clipboard blocked
+      toast("Gagal menyalin ke clipboard.", "error");
     }
   }
 
   return (
     <section className="space-y-3 rounded-xl border bg-[var(--surface)] p-5 shadow-xs">
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Buka Kredensial Remote?"
+        message="Pembukaan ID dan password AnyDesk/UltraViewer akan dicatat ke log audit keamanan untuk tiket ini."
+        confirmLabel="Buka Kredensial"
+        busy={loading}
+        onConfirm={() => void handleReveal()}
+        onCancel={() => setConfirmOpen(false)}
+      />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-[var(--foreground)]">
           Kredensial Remote (AnyDesk &amp; UV)
@@ -77,7 +94,7 @@ export default function RemoteCredentialPanel({
           <button
             type="button"
             disabled={loading}
-            onClick={() => void handleReveal()}
+            onClick={() => setConfirmOpen(true)}
             className="min-h-9 rounded-lg bg-[#1d4ed8] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
           >
             {loading ? "Membuka..." : "Tampilkan Kredensial Remote"}

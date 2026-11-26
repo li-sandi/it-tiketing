@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logAdminAction } from "@/lib/admin-audit";
 import { getAdminUser } from "@/lib/admin-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -70,6 +71,15 @@ export async function POST(request: Request) {
     .select("*")
     .single();
   if (error) return jsonError("Gagal menambah site.", 500);
+
+  await logAdminAction({
+    aktorId: adminUser.user.id,
+    aksi: "create",
+    entitas: "site",
+    entitasId: data.id,
+    ringkasan: `Menambah site "${nama}" (${jumlahUser} user)`,
+    detail: { nama, jumlah_user: jumlahUser, punya_it: punyaIt, aktif },
+  });
 
   return NextResponse.json(
     { ok: true, site: data },

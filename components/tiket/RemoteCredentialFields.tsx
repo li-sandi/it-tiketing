@@ -69,6 +69,7 @@ export default function RemoteCredentialFields({
           uvId?: string | null;
           ramGb?: number | null;
           assetName?: string | null;
+          hasSavedRemoteId?: boolean;
           error?: string;
         };
         if (!response.ok) {
@@ -88,7 +89,9 @@ export default function RemoteCredentialFields({
         setLookupMessage(
           result.anydeskId || result.uvId
             ? "ID statis untuk aset ini diisi otomatis."
-            : "Belum ada ID remote tersimpan untuk aset ini.",
+            : result.hasSavedRemoteId
+              ? "ID remote statis aset terdaftar dan akan ditautkan otomatis saat tiket dikirim."
+              : "Belum ada ID remote tersimpan untuk aset ini.",
         );
       } catch (error) {
         if (controller.signal.aborted) return;

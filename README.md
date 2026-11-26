@@ -47,8 +47,9 @@ Fokus operasional saat ini: **Debito Jogja** (400 user, 1 entitas site aktif).
 | `/admin/kategori` | Admin | Tambah/edit kategori, kelompok kategori, prioritas, & persyaratan form |
 | `/admin/sites` | Admin | Kelola site aktif (`Debito Jogja`, 400 user) & nonaktif |
 | `/admin/users` | Admin | Kelola peran (`user`, `it`, `ga`, `admin`) & site user |
-| `/admin/jadwal` | Admin | Generator jadwal kunjungan multi-site dinamis (fase lanjutan) |
+| `/admin/jadwal` | Admin | Generator jadwal kunjungan multi-site dinamis (tampil saat `sleman_routing_enabled` aktif) |
 | `/admin/pengaturan` | Admin | Feature flag, daftar hari libur SLA P3, rate limit, & laporan mingguan |
+| `/admin/audit` | Admin | Riwayat log audit perubahan kategori, site, user, & pengaturan admin |
 
 ## Menjalankan Secara Lokal
 
@@ -64,7 +65,7 @@ Fokus operasional saat ini: **Debito Jogja** (400 user, 1 entitas site aktif).
    cp .env.example .env.local
    ```
 
-3. Terapkan migrasi SQL di `supabase/migrations/` secara berurutan (`0001` sampai `0030`), lihat [supabase/README.md](./supabase/README.md). *(Untuk project Supabase `it-ticketing` / `nfpepubznnrmbrutnywl`, migrasi `0020`–`0030` sudah diterapkan langsung ke database live.)*
+3. Terapkan migrasi SQL di `supabase/migrations/` secara berurutan (`0001` sampai `0031`), lihat [supabase/README.md](./supabase/README.md). *(Untuk project Supabase `it-ticketing` / `nfpepubznnrmbrutnywl`, migrasi `0020`–`0031` sudah diterapkan langsung ke database live.)*
 4. Jalankan server pengembangan:
 
    ```bash
@@ -83,9 +84,11 @@ npm run build    # production build
 
 ## Riwayat Perubahan (Changelog)
 
-Rincian lengkap setiap perubahan (migrasi database `0020`–`0030`, endpoint API, perbaikan bug, komponen UI, pengujian, dan paket on-premise) didokumentasikan di [CHANGELOG.md](./CHANGELOG.md).
+Rincian lengkap setiap perubahan (migrasi database `0020`–`0031`, endpoint API, perbaikan bug, komponen UI, pengujian, CI, dan paket on-premise) didokumentasikan di [CHANGELOG.md](./CHANGELOG.md).
 
-Ringkasan rilis terbaru (**2026-11-26 — Antarmuka Corporate Service Desk, Revamp Kategori, Stok Sparepart, & Kesiapan Operasional**):
+Ringkasan rilis terbaru (**2026-11-26 — Hardening Keamanan, Audit Admin, Peningkatan UX, & CI**):
+- Penutupan kebocoran ID AnyDesk/UV anonim pada `/api/tiket/remote-ids` & pembatasan akses `/api/aset/lookup`, penautan ID aset di server, audit perubahan admin (`0031_admin_audit_logs.sql`, `/admin/audit`), serta `.github/workflows/ci.yml` dan `scripts/verify-rls.sql`.
+- Peningkatan UX operasional: tabel interaktif desktop + kartu mobile di `/antrian` dan `/tiket`, pratinjau prioritas & SLA sebelum kirim, progress bar SLA, toast & dialog konfirmasi aksesibel, serta skeleton loading pada rute utama.
 - Pembaruan antarmuka bergaya Corporate Service Desk di seluruh halaman & komponen dalam dengan navigasi Sidebar + Top Bar responsif (`AppShell`), dukungan mode terang/gelap terverifikasi kontras WCAG AA, dan portal beranda SLA.
 - Pembaruan kategori IT sesuai *Daily Ticket Report* Debito Jogja + relasi stok sparepart di Admin Kategori + import massal CSV aset (`/aset`) + seed 10 artikel Wiki/SOP (`0030`) + modul stok sparepart (`/stok`) auto-pengadaan bulan depan.
 - Konsolidasi site menjadi **Debito Jogja** (400 user), pengelompokan kategori 2 langkah, serta peningkatan halaman `/tiket`, `/antrian`, `/dashboard`, dan `/admin/*`.

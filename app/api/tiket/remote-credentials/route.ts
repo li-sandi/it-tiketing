@@ -65,12 +65,29 @@ export async function POST(request: Request) {
 
   const { data: ticket, error: ticketError } = await supabase
     .from("tickets")
-    .select("id")
+    .select("id, nomor_aset")
     .eq("id", ticketId)
     .eq("pembuat_id", user.id)
     .maybeSingle();
   if (ticketError) return jsonError("Gagal memverifikasi tiket.", 500);
   if (!ticket) return jsonError("Tiket tidak ditemukan.", 404);
+
+  let resolvedAnydeskId = anydeskId;
+  let resolvedUvId = uvId;
+  const admin = createAdminClient();
+  if (ticket.nomor_aset && (!resolvedAnydeskId || !resolvedUvId)) {
+    const { data: registeredAsset } = await admin
+      .from("assets")
+      .select("anydesk_id, uv_id")
+      .ilike("nomor_aset", ticket.nomor_aset)
+      .maybeSingle();
+    if (!resolvedAnydeskId && registeredAsset?.anydesk_id) {
+      resolvedAnydeskId = registeredAsset.anydesk_id;
+    }
+    if (!resolvedUvId && registeredAsset?.uv_id) {
+      resolvedUvId = registeredAsset.uv_id;
+    }
+  }
 
   let encAnydesk: string | null = null;
   let encUv: string | null = null;
@@ -84,23 +101,23 @@ export async function POST(request: Request) {
 
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   const rows = [
-    ...(anydeskId || encAnydesk
+    ...(resolvedAnydeskId || encAnydesk
       ? [
           {
             ticket_id: ticketId,
             aplikasi: "anydesk",
-            remote_id: anydeskId || "-",
+            remote_id: resolvedAnydeskId || "-",
             password_terenkripsi: encAnydesk,
             kedaluwarsa_pada: encAnydesk ? expiresAt : null,
           },
         ]
       : []),
-    ...(uvId || encUv
+    ...(resolvedUvId || encUv
       ? [
           {
             ticket_id: ticketId,
             aplikasi: "uv",
-            remote_id: uvId || "-",
+            remote_id: resolvedUvId || "-",
             password_terenkripsi: encUv,
             kedaluwarsa_pada: encUv ? expiresAt : null,
           },
@@ -112,7 +129,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
   }
 
-  const admin = createAdminClient();
   const { error: insertError } = await admin.from("remote_credentials").insert(rows);
   if (insertError) {
     console.error("Gagal menyimpan kredensial remote:", insertError.message);

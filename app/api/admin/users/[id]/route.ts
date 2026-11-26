@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logAdminAction } from "@/lib/admin-audit";
 import { getAdminUser } from "@/lib/admin-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -122,6 +123,15 @@ export async function PATCH(
     console.error("Gagal mengubah user:", error.message);
     return jsonError("Gagal menyimpan perubahan user.", 500);
   }
+
+  await logAdminAction({
+    aktorId: adminUser.user.id,
+    aksi: "update",
+    entitas: "user",
+    entitasId: id,
+    ringkasan: `Mengubah ${Object.keys(update).join(", ")} user ${id}`,
+    detail: update,
+  });
 
   return NextResponse.json(
     { ok: true },

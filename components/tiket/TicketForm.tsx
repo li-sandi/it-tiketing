@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import CategoryGroupSelector, {
   type CategoryOption,
 } from "@/components/tiket/CategoryGroupSelector";
+import PriorityPreviewBanner from "@/components/tiket/PriorityPreviewBanner";
 import RemoteCredentialFields from "@/components/tiket/RemoteCredentialFields";
 import SelfCheckPanel from "@/components/tiket/SelfCheckPanel";
 import { hitungPrioritas, parseAturanKenaikan } from "@/lib/prioritas";
@@ -325,6 +326,20 @@ export default function TicketForm({
           setRemoteFile(null);
         }}
       />
+
+      {kategori && (
+        <PriorityPreviewBanner
+          prioritasDefault={kategori.prioritas_default}
+          prioritasNaik={kategori.prioritas_naik}
+          jumlahUserTerdampak={
+            typeof jumlahUser === "number" ? jumlahUser : undefined
+          }
+          jumlahUserSite={jumlahUserSite}
+          jumlahTaskVendor={
+            typeof jumlahTask === "number" ? jumlahTask : undefined
+          }
+        />
+      )}
 
       {kategori?.stock_kode && (
         <div

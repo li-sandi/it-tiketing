@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logAdminAction } from "@/lib/admin-audit";
 import { getAdminUser } from "@/lib/admin-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -77,6 +78,15 @@ export async function PATCH(request: Request) {
     { onConflict: "kunci" },
   );
   if (error) return jsonError("Gagal menyimpan pengaturan.", 500);
+
+  await logAdminAction({
+    aktorId: adminUser.user.id,
+    aksi: "update",
+    entitas: "settings",
+    entitasId: kunci,
+    ringkasan: `Mengubah pengaturan sistem "${kunci}"`,
+    detail: record.nilai,
+  });
 
   return NextResponse.json(
     { ok: true },

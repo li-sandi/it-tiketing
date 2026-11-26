@@ -6,6 +6,7 @@ import {
   changeTicketStatus,
   claimTicket,
 } from "@/app/tiket/[id]/actions";
+import { useToast } from "@/components/ui/ToastProvider";
 import {
   getNextTicketStatuses,
   ticketStatusLabels,
@@ -36,6 +37,8 @@ export default function TicketActions({
   const canUpdate =
     role === "admin" || (role === "it" && assigneeId === userId);
 
+  const { toast } = useToast();
+
   async function runAction(action: () => Promise<{ error?: string; notice?: string }>) {
     setBusy(true);
     setError(null);
@@ -44,6 +47,11 @@ export default function TicketActions({
     const result = await action();
     setError(result.error ?? null);
     setNotice(result.notice ?? null);
+    if (result.error) {
+      toast(result.error, "error");
+    } else if (result.notice) {
+      toast(result.notice, "success");
+    }
     setBusy(false);
     router.refresh();
   }

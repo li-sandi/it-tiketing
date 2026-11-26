@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { redirect } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
 import { PrioritasBadge, StatusBadge } from "@/components/tiket/StatusBadge";
+import TicketBoardClient from "@/components/tiket/TicketBoardClient";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -107,6 +108,16 @@ export default async function TiketPage({
   ]);
 
   const showSiteFilter = (sites?.length ?? 0) > 1;
+  const boardTickets = (activeTickets ?? []).map((ticket) => ({
+    id: ticket.id,
+    nomor_tiket: ticket.nomor_tiket,
+    prioritas: ticket.prioritas,
+    status: ticket.status,
+    dibuat_pada: ticket.dibuat_pada,
+    kategori: relationName(ticket.categories),
+    site: relationName(ticket.sites),
+    canOpen: isStaff || ticket.pembuat_id === user.id,
+  }));
 
   return (
     <AppShell
@@ -171,57 +182,13 @@ export default async function TiketPage({
         <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           Gagal memuat tiket aktif: {activeError.message}
         </p>
-      ) : !activeTickets?.length ? (
-        <div className="rounded-xl border bg-[var(--surface)] p-8 text-center shadow-xs">
-          <p className="text-sm font-medium text-[var(--foreground)]">
-            Tidak ada tiket aktif saat ini.
-          </p>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            Seluruh laporan gangguan atau permintaan sudah selesai ditangani.
-          </p>
-        </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border bg-[var(--surface)] shadow-xs">
-          <ul className="divide-y">
-            {activeTickets.map((ticket) => {
-              const content = (
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs font-medium tabular-nums text-[var(--muted)]">
-                        {ticket.nomor_tiket}
-                      </span>
-                      <PrioritasBadge prioritas={ticket.prioritas} />
-                      <StatusBadge status={ticket.status} />
-                    </div>
-                    <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-                      {relationName(ticket.categories)}
-                    </p>
-                  </div>
-                  <p className="text-xs text-[var(--muted)]">
-                    {relationName(ticket.sites)} · {formatDate(ticket.dibuat_pada)}
-                  </p>
-                </div>
-              );
-              const canOpen = isStaff || ticket.pembuat_id === user.id;
-
-              return (
-                <li key={ticket.id}>
-                  {canOpen ? (
-                    <Link
-                      href={`/tiket/${ticket.id}`}
-                      className="block px-4 py-3.5 hover:bg-[var(--surface-muted)] sm:px-5"
-                    >
-                      {content}
-                    </Link>
-                  ) : (
-                    <div className="px-4 py-3.5 sm:px-5">{content}</div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
+        <TicketBoardClient
+          tickets={boardTickets}
+          emptyMessage="Tidak ada tiket aktif saat ini."
+          showSite
+          showDescription={false}
+        />
       )}
 
       <section className="space-y-3 pt-2">

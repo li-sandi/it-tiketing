@@ -32,3 +32,4 @@ Jalankan berurutan di Supabase SQL Editor atau menggunakan `node scripts/run-mig
 28. `migrations/0028_sparepart_stock_and_auto_procurement.sql` — tabel `inventory_stocks` & `stock_movements`, auto-pengadaan bulan depan saat stok = 0 di `init_ticket_asset_and_approval()`, event log, RLS, dan RPC atomik `adjust_inventory_stock()`
 29. `migrations/0029_harden_stock_rpc_permissions.sql` — pencabutan izin `anon`/`PUBLIC` dan penegasan guard `service_role`/`authenticated` pada RPC stok & trigger log
 30. `migrations/0030_seed_initial_wiki_sop.sql` — seed 10 artikel Wiki & SOP awal berdasarkan Daily Ticket Report Debito Jogja (`status = 'published'`)
+31. `migrations/0031_admin_audit_logs.sql` — tabel `admin_audit_logs`, indeks, dan kebijakan RLS baca khusus `admin` untuk mencatat perubahan pengaturan sistem

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logAdminAction } from "@/lib/admin-audit";
 import { getAdminUser } from "@/lib/admin-auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -79,6 +80,15 @@ export async function PATCH(
   const admin = createAdminClient();
   const { error } = await admin.from("sites").update(updates).eq("id", id);
   if (error) return jsonError("Gagal memperbarui site.", 500);
+
+  await logAdminAction({
+    aktorId: adminUser.user.id,
+    aksi: "update",
+    entitas: "site",
+    entitasId: id,
+    ringkasan: `Memperbarui site ${id}: ${Object.keys(updates).join(", ")}`,
+    detail: updates,
+  });
 
   return NextResponse.json(
     { ok: true },

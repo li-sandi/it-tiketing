@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import ItStatusToggle from "@/components/it/ItStatusToggle";
 import AppShell from "@/components/layout/AppShell";
-import { PrioritasBadge, StatusBadge } from "@/components/tiket/StatusBadge";
+import TicketBoardClient from "@/components/tiket/TicketBoardClient";
 import { createClient } from "@/lib/supabase/server";
 
 export const instant = false;
@@ -13,14 +13,6 @@ function getRelationName(
 ) {
   if (Array.isArray(relation)) return relation[0]?.nama ?? "-";
   return relation?.nama ?? "-";
-}
-
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("id-ID", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Jakarta",
-  }).format(new Date(value));
 }
 
 export default async function AntrianPage() {
@@ -105,57 +97,19 @@ export default async function AntrianPage() {
       .maybeSingle(),
   ]);
 
-  function renderTickets(
-    tickets: NonNullable<typeof queue>,
-    emptyMessage: string,
-    showSite: boolean,
-  ) {
-    if (!tickets.length) {
-      return (
-        <div className="rounded-xl border bg-[var(--surface)] p-5 text-sm text-[var(--muted)]">
-          {emptyMessage}
-        </div>
-      );
-    }
-
-    return (
-      <div className="overflow-hidden rounded-xl border bg-[var(--surface)] shadow-xs">
-        <ul className="divide-y">
-          {tickets.map((ticket) => (
-            <li key={ticket.id}>
-              <Link
-                href={`/tiket/${ticket.id}`}
-                className="block px-4 py-3.5 hover:bg-[var(--surface-muted)] sm:px-5"
-              >
-                <div className="mb-1.5 flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-xs font-medium tabular-nums text-[var(--muted)]">
-                    {ticket.nomor_tiket}
-                  </span>
-                  <PrioritasBadge prioritas={ticket.prioritas} />
-                  <StatusBadge status={ticket.status} />
-                  {(ticket.aging_level ?? 0) > 0 && (
-                    <span className="rounded-md border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
-                      Aging +{ticket.aging_level}
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm font-semibold text-[var(--foreground)]">
-                  {getRelationName(ticket.categories)}
-                </p>
-                <p className="mt-0.5 truncate text-sm text-[var(--secondary)]">
-                  {ticket.deskripsi}
-                </p>
-                {showSite && (
-                  <p className="mt-1 text-xs text-[var(--muted)]">
-                    Site {getRelationName(ticket.sites)} · {formatDate(ticket.dibuat_pada)}
-                  </p>
-                )}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
+  function toBoardRows(rows: NonNullable<typeof queue>) {
+    return rows.map((ticket) => ({
+      id: ticket.id,
+      nomor_tiket: ticket.nomor_tiket,
+      prioritas: ticket.prioritas,
+      status: ticket.status,
+      dibuat_pada: ticket.dibuat_pada,
+      kategori: getRelationName(ticket.categories),
+      site: getRelationName(ticket.sites),
+      deskripsi: ticket.deskripsi,
+      aging_level: ticket.aging_level,
+      canOpen: true,
+    }));
   }
 
   return (
@@ -179,17 +133,20 @@ export default async function AntrianPage() {
       )}
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-base font-semibold text-[var(--foreground)]">
-            Antrian Baru ({queue?.length ?? 0})
-          </h2>
-        </div>
+        <h2 className="text-base font-semibold text-[var(--foreground)]">
+          Antrian Baru ({queue?.length ?? 0})
+        </h2>
         {queueError ? (
           <p role="alert" className="text-sm text-red-700">
             Gagal memuat antrian baru: {queueError.message}
           </p>
         ) : (
-          renderTickets(queue ?? [], "Tidak ada tiket baru di antrian.", true)
+          <TicketBoardClient
+            tickets={toBoardRows(queue ?? [])}
+            emptyMessage="Tidak ada tiket baru di antrian."
+            showSite
+            showDescription
+          />
         )}
       </section>
 
@@ -202,11 +159,12 @@ export default async function AntrianPage() {
             Gagal memuat antrian pengadaan: {procurementError.message}
           </p>
         ) : (
-          renderTickets(
-            procurementQueue ?? [],
-            "Tidak ada tiket yang menunggu pengadaan sparepart.",
-            true,
-          )
+          <TicketBoardClient
+            tickets={toBoardRows(procurementQueue ?? [])}
+            emptyMessage="Tidak ada tiket yang menunggu pengadaan sparepart."
+            showSite
+            showDescription
+          />
         )}
       </section>
 
@@ -219,11 +177,12 @@ export default async function AntrianPage() {
             Gagal memuat tiket yang sedang ditangani: {myTicketsError.message}
           </p>
         ) : (
-          renderTickets(
-            myTickets ?? [],
-            "Anda belum memegang tiket aktif.",
-            false,
-          )
+          <TicketBoardClient
+            tickets={toBoardRows(myTickets ?? [])}
+            emptyMessage="Anda belum memegang tiket aktif."
+            showSite={false}
+            showDescription
+          />
         )}
       </section>
     </AppShell>

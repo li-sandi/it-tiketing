@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type MergeCandidate = {
   id: string;
@@ -19,7 +21,9 @@ export default function MergeTicketPanel({
   candidates: MergeCandidate[];
 }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [selected, setSelected] = useState<string[]>([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -32,15 +36,9 @@ export default function MergeTicketPanel({
     );
   }
 
-  async function handleMerge() {
+  async function executeMerge() {
     if (selected.length === 0) return;
-    if (
-      !window.confirm(
-        `Gabungkan ${selected.length} tiket ke tiket ini? Saat tiket ini selesai, tiket yang digabungkan otomatis ikut selesai.`,
-      )
-    ) {
-      return;
-    }
+    setConfirmOpen(false);
 
     setBusy(true);
     setError(null);
@@ -59,13 +57,16 @@ export default function MergeTicketPanel({
         mergedCount?: number;
       };
       if (!res.ok) throw new Error(data.error ?? "Gagal menggabungkan tiket.");
-      setNotice(`Berhasil menggabungkan ${data.mergedCount ?? selected.length} tiket.`);
+      const okMsg = `Berhasil menggabungkan ${data.mergedCount ?? selected.length} tiket.`;
+      setNotice(okMsg);
+      toast(okMsg, "success");
       setSelected([]);
       router.refresh();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Gagal menggabungkan tiket.",
-      );
+      const errMsg =
+        err instanceof Error ? err.message : "Gagal menggabungkan tiket.";
+      setError(errMsg);
+      toast(errMsg, "error");
     } finally {
       setBusy(false);
     }
@@ -73,6 +74,15 @@ export default function MergeTicketPanel({
 
   return (
     <section className="space-y-3 rounded-xl border bg-[var(--surface)] p-5 shadow-xs">
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Gabungkan Tiket Serupa?"
+        message={`Gabungkan ${selected.length} tiket ke tiket ini? Saat tiket ini selesai, tiket yang digabungkan otomatis ikut selesai.`}
+        confirmLabel="Gabungkan Tiket"
+        busy={busy}
+        onConfirm={() => void executeMerge()}
+        onCancel={() => setConfirmOpen(false)}
+      />
       <h2 className="text-sm font-semibold text-[var(--foreground)]">
         Gabungkan Tiket Serupa (Merge)
       </h2>
@@ -104,7 +114,9 @@ export default function MergeTicketPanel({
       <button
         type="button"
         disabled={busy || selected.length === 0}
-        onClick={() => void handleMerge()}
+        onClick={() => {
+          if (selected.length > 0) setConfirmOpen(true);
+        }}
         className="min-h-9 rounded-lg border bg-[var(--surface)] px-3.5 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--surface-muted)] disabled:opacity-50"
       >
         {busy ? "Menggabungkan..." : `Gabungkan (${selected.length})`}

@@ -4,7 +4,7 @@ import PublicHeader from "@/components/layout/PublicHeader";
 const SLA_ROWS = [
   { level: "P0", label: "Kritis / Down", respon: "5 menit", resolusi: "30 menit", tone: "bg-red-700 text-white" },
   { level: "P1", label: "Tinggi", respon: "15 menit", resolusi: "2 jam", tone: "bg-orange-700 text-white" },
-  { level: "P2", label: "Sedang", respon: "30 menit", resolusi: "4 jam", tone: "bg-amber-100 text-amber-900 border border-amber-300" },
+  { level: "P2", label: "Sedang", respon: "30 menit", resolusi: "4 jam", tone: "bg-blue-100 text-blue-800 border border-blue-300" },
   { level: "P3", label: "Normal", respon: "2 jam", resolusi: "1 hari kerja", tone: "bg-slate-100 text-slate-800 border border-slate-300" },
 ];
 
@@ -50,6 +50,35 @@ export default function Home() {
             <p className="text-sm text-[var(--muted)]">
               Pelapor tanpa akun langsung menerima tautan pelacakan privat begitu tiket dikirim.
             </p>
+
+            <div className="grid gap-3 border-t pt-5 sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                  Jam Layanan IT
+                </p>
+                <p className="mt-1 text-sm font-medium text-[var(--foreground)]">
+                  Senin s.d. Jumat, 08.00 - 17.00 WIB
+                </p>
+                <p className="text-xs text-[var(--muted)]">
+                  Insiden kritis P0 diprioritaskan segera.
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                  Cakupan Bantuan
+                </p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5 text-xs">
+                  {["Jaringan & VPN", "Perangkat & Sparepart", "Genesys, MicroSIP & WPS", "Setup Laptop & Akses"].map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-md border bg-[var(--surface)] px-2 py-0.5 text-[var(--secondary)]"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
           </section>
 
           <aside className="rounded-xl border bg-[var(--surface)] p-5 shadow-xs sm:p-6 lg:col-span-5">

@@ -107,3 +107,40 @@ export async function checkPublicTicketRateLimit(params: {
     reset: result.reset,
   };
 }
+
+export async function checkEndpointRateLimit(params: {
+  ip: string;
+  bucket: string;
+  limit: number;
+  windowMinutes: number;
+}): Promise<LimitOutcome> {
+  const { ip, bucket, limit, windowMinutes } = params;
+  const backend = process.env.RATE_LIMIT_BACKEND?.trim().toLowerCase();
+  const hasUpstash =
+    Boolean(process.env.UPSTASH_REDIS_REST_URL) &&
+    Boolean(process.env.UPSTASH_REDIS_REST_TOKEN);
+
+  if (backend === "memory" || !hasUpstash) {
+    return memorySlidingLimit(`${bucket}:${ip}`, limit, windowMinutes);
+  }
+
+  const cacheKey = `${bucket}:${limit}:${windowMinutes}`;
+  let limiter = upstashLimiters.get(cacheKey);
+  if (!limiter) {
+    limiter = new Ratelimit({
+      redis: Redis.fromEnv(),
+      limiter: Ratelimit.slidingWindow(limit, `${windowMinutes} m`),
+      analytics: false,
+      prefix: `it-ticketing:${bucket}`,
+    });
+    upstashLimiters.set(cacheKey, limiter);
+  }
+
+  const result = await limiter.limit(ip);
+  return {
+    success: result.success,
+    limit: result.limit,
+    remaining: result.remaining,
+    reset: result.reset,
+  };
+}
