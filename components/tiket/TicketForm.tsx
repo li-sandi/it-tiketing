@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import CategoryGroupSelector, {
@@ -98,6 +98,42 @@ export default function TicketForm({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [createdTicketId, setCreatedTicketId] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const shouldResetRef = useRef(false);
+
+  const resetFormState = useCallback(() => {
+    setCategoryId("");
+    setDeskripsi("");
+    setJumlahUser("");
+    setJumlahTask("");
+    setNomorAset("");
+    setFile(null);
+    setFileError(null);
+    setPenanganan("onsite");
+    setAnydeskId("");
+    setAnydeskPassword("");
+    setUvId("");
+    setUvPassword("");
+    setRemoteFile(null);
+    setRamWarning(null);
+    setRequestUpgradeRam(false);
+    setError(null);
+    setNotice(null);
+    setCreatedTicketId(null);
+    setLoading(false);
+    formRef.current?.reset();
+  }, []);
+
+  useLayoutEffect(() => {
+    return () => {
+      if (shouldResetRef.current) {
+        shouldResetRef.current = false;
+        resetFormState();
+      } else {
+        setLoading(false);
+      }
+    };
+  }, [resetFormState]);
 
   const kategori = categories.find((category) => category.id === categoryId);
   const aturan = parseAturanKenaikan(kategori?.prioritas_naik);
@@ -293,12 +329,15 @@ export default function TicketForm({
     }
 
     if (postCreateWarnings.length > 0) {
+      shouldResetRef.current = true;
       setCreatedTicketId(ticket.id);
       setNotice(`Tiket dibuat, tetapi ${postCreateWarnings.join("; ")}.`);
       setLoading(false);
       return;
     }
 
+    shouldResetRef.current = true;
+    resetFormState();
     router.push(
       ticket.status === "menunggu_pengadaan" ? `/tiket/${ticket.id}` : "/tiket",
     );
@@ -306,7 +345,7 @@ export default function TicketForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
       <CategoryGroupSelector
         categories={categories}
         selectedCategoryId={categoryId}

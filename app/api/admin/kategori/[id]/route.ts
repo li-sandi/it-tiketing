@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { logAdminAction } from "@/lib/admin-audit";
 import { getAdminUser } from "@/lib/admin-auth";
@@ -144,6 +145,8 @@ export async function PATCH(
     console.error("Gagal mengubah kategori:", error.message);
     return jsonError("Gagal menyimpan perubahan kategori.", 500);
   }
+
+  revalidateTag("categories", { expire: 0 });
 
   await logAdminAction({
     aktorId: adminUser.user.id,

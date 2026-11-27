@@ -6,7 +6,7 @@ import { PrioritasBadge, StatusBadge } from "@/components/tiket/StatusBadge";
 import { formatProcurementEstimate } from "@/lib/stok";
 import { ticketStatusLabels } from "@/lib/tiket-status";
 
-type TicketStatusData = {
+export type TicketStatusData = {
   nomor_tiket: string;
   status: string;
   prioritas: string;
@@ -27,7 +27,8 @@ type TicketStatusData = {
   site: string | null;
   it: string | null;
 };
-type TicketDetail = {
+
+export type TicketDetail = {
   tiket: TicketStatusData;
   events: Array<{
     jenis: string;
@@ -66,14 +67,27 @@ function describeEvent(event: TicketDetail["events"][number]) {
   return "Pembaruan tiket";
 }
 
-export default function PublicTicketStatus({ token }: { token: string }) {
-  const [detail, setDetail] = useState<TicketDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export default function PublicTicketStatus({
+  token,
+  initialDetail,
+  initialError,
+}: {
+  token: string;
+  initialDetail?: TicketDetail | null;
+  initialError?: string | null;
+}) {
+  const hasInitialState =
+    initialDetail !== undefined || initialError !== undefined;
+  const [detail, setDetail] = useState<TicketDetail | null>(
+    initialDetail ?? null,
+  );
+  const [error, setError] = useState<string | null>(initialError ?? null);
   const [rating, setRating] = useState(5);
   const [ratingError, setRatingError] = useState<string | null>(null);
   const [ratingPending, setRatingPending] = useState(false);
 
   useEffect(() => {
+    if (hasInitialState) return;
     const controller = new AbortController();
 
     async function loadTicket() {
@@ -102,7 +116,7 @@ export default function PublicTicketStatus({ token }: { token: string }) {
 
     void loadTicket();
     return () => controller.abort();
-  }, [token]);
+  }, [token, hasInitialState]);
 
   async function refreshTicket() {
     const response = await fetch(

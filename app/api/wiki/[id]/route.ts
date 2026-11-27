@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -96,6 +97,8 @@ export async function PATCH(
     .eq("id", id);
   if (error) return jsonError("Gagal memperbarui artikel.", 500);
 
+  revalidateTag("wiki", { expire: 0 });
+
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -123,6 +126,8 @@ export async function DELETE(
   const admin = createAdminClient();
   const { error } = await admin.from("knowledge_articles").delete().eq("id", id);
   if (error) return jsonError("Gagal menghapus artikel.", 500);
+
+  revalidateTag("wiki", { expire: 0 });
 
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }

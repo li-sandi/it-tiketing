@@ -4,22 +4,38 @@ import { createClient } from "@/lib/supabase/server";
 
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
+
+function jsonError(error: string, status: number) {
+  return NextResponse.json({ error }, { status, headers: NO_STORE_HEADERS });
+}
 
 export async function POST(request: Request) {
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      if (new URL(origin).origin !== new URL(request.url).origin) {
+        return jsonError("Asal permintaan tidak diizinkan.", 403);
+      }
+    } catch {
+      return jsonError("Header asal permintaan tidak valid.", 403);
+    }
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser();
   if (authError || !user) {
-    return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    return jsonError("Belum login.", 401);
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Body JSON tidak valid." }, { status: 400 });
+    return jsonError("Body JSON tidak valid.", 400);
   }
 
   if (
@@ -29,10 +45,7 @@ export async function POST(request: Request) {
     typeof body.ticketId !== "string" ||
     !uuidPattern.test(body.ticketId)
   ) {
-    return NextResponse.json(
-      { error: "ticketId harus berupa UUID yang valid." },
-      { status: 400 },
-    );
+    return jsonError("ticketId harus berupa UUID yang valid.", 400);
   }
 
   const { data: ticket, error: ticketError } = await supabase
@@ -44,13 +57,10 @@ export async function POST(request: Request) {
 
   if (ticketError) {
     console.error("Gagal memverifikasi tiket untuk notifikasi:", ticketError.message);
-    return NextResponse.json(
-      { error: "Gagal memverifikasi tiket." },
-      { status: 500 },
-    );
+    return jsonError("Gagal memverifikasi tiket.", 500);
   }
   if (!ticket) {
-    return NextResponse.json({ error: "Tiket tidak ditemukan." }, { status: 404 });
+    return jsonError("Tiket tidak ditemukan.", 404);
   }
 
   const createdAt = new Date(ticket.dibuat_pada).getTime();
@@ -61,9 +71,9 @@ export async function POST(request: Request) {
     ageMs < 0 ||
     ageMs > 5 * 60 * 1000
   ) {
-    return NextResponse.json(
-      { error: "Notifikasi hanya dapat dipicu untuk tiket baru yang baru dibuat." },
-      { status: 409 },
+    return jsonError(
+      "Notifikasi hanya dapat dipicu untuk tiket baru yang baru dibuat.",
+      409,
     );
   }
 
@@ -72,8 +82,11 @@ export async function POST(request: Request) {
   if (warnings.length) {
     return NextResponse.json(
       { ok: false, kunjungan, warnings },
-      { status: 207 },
+      { status: 207, headers: NO_STORE_HEADERS },
     );
   }
-  return NextResponse.json({ ok: true, kunjungan });
+  return NextResponse.json(
+    { ok: true, kunjungan },
+    { headers: NO_STORE_HEADERS },
+  );
 }

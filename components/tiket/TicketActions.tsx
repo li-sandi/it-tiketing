@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   changeTicketStatus,
   claimTicket,
-} from "@/app/tiket/[id]/actions";
+} from "@/app/(app)/tiket/[id]/actions";
 import { useToast } from "@/components/ui/ToastProvider";
 import {
   getNextTicketStatuses,

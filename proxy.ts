@@ -1,12 +1,30 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+const SUPABASE_AUTH_COOKIE_RE = /^sb-.+-auth-token(?:\.(?:0|[1-9]\d*))?$/;
+
+export function hasSupabaseAuthCookie(
+  cookies: ReadonlyArray<{ name: string }>,
+): boolean {
+  return cookies.some(({ name }) => SUPABASE_AUTH_COOKIE_RE.test(name));
+}
+
 export async function proxy(request: NextRequest) {
+  if (!hasSupabaseAuthCookie(request.cookies.getAll())) {
+    return NextResponse.next({ request });
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -25,7 +43,7 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  await supabase.auth.getUser();
+  await supabase.auth.getClaims();
 
   return response;
 }

@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { logAdminAction } from "@/lib/admin-audit";
 import { getAdminUser } from "@/lib/admin-auth";
@@ -71,6 +72,8 @@ export async function POST(request: Request) {
     .select("*")
     .single();
   if (error) return jsonError("Gagal menambah site.", 500);
+
+  revalidateTag("sites", { expire: 0 });
 
   await logAdminAction({
     aktorId: adminUser.user.id,

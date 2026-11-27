@@ -19,7 +19,19 @@ export async function GET(
   const { token } = await params;
   if (!UUID_PATTERN.test(token)) return notFound();
 
-  const admin = createAdminClient();
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (err) {
+    console.error(
+      "Konfigurasi Supabase admin tidak tersedia untuk status tiket:",
+      err instanceof Error ? err.message : err,
+    );
+    return NextResponse.json(
+      { error: "Gagal memuat status tiket." },
+      { status: 500, headers: PRIVATE_HEADERS },
+    );
+  }
   const { data: ticket, error: ticketError } = await admin
     .from("tickets")
     .select(

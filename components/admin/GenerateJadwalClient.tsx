@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/components/ui/ToastProvider";
 
 type StaffItem = { id: string; nama: string };
 type SiteItem = { id: string; nama: string };
@@ -14,11 +16,13 @@ export default function GenerateJadwalClient({
   sites: SiteItem[];
 }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [selectedStaff, setSelectedStaff] = useState<string[]>(() =>
     itStaff.slice(0, 2).map((s) => s.id),
   );
   const [siteId, setSiteId] = useState(sites[0]?.id ?? "");
   const [loading, setLoading] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [pesan, setPesan] = useState<{
     type: "success" | "error";
     text: string;
@@ -30,22 +34,24 @@ export default function GenerateJadwalClient({
     );
   }
 
-  async function handleGenerate() {
+  function requestGenerate() {
     if (selectedStaff.length < 2) {
-      setPesan({
-        type: "error",
-        text: "Pilih minimal 2 petugas IT untuk rotasi jadwal.",
-      });
+      const errMsg = "Pilih minimal 2 petugas IT untuk rotasi jadwal.";
+      setPesan({ type: "error", text: errMsg });
+      toast(errMsg, "error");
       return;
     }
-    if (
-      !window.confirm(
-        "Jadwal kunjungan dalam periode 8 minggu ke depan akan diganti. Lanjutkan?",
-      )
-    ) {
+    if (!siteId) {
+      const errMsg = "Pilih site tujuan terlebih dahulu.";
+      setPesan({ type: "error", text: errMsg });
+      toast(errMsg, "error");
       return;
     }
+    setConfirmOpen(true);
+  }
 
+  async function executeGenerate() {
+    setConfirmOpen(false);
     setLoading(true);
     setPesan(null);
     try {
@@ -64,16 +70,15 @@ export default function GenerateJadwalClient({
         throw new Error(result.error ?? "Gagal membuat jadwal.");
       }
 
-      setPesan({
-        type: "success",
-        text: `Berhasil membuat ${result.jumlah} jadwal (${result.mulai} sampai ${result.sampai}).`,
-      });
+      const successMsg = `Berhasil membuat ${result.jumlah} jadwal (${result.mulai} sampai ${result.sampai}).`;
+      setPesan({ type: "success", text: successMsg });
+      toast(successMsg, "success");
       router.refresh();
     } catch (error) {
-      setPesan({
-        type: "error",
-        text: error instanceof Error ? error.message : "Gagal membuat jadwal.",
-      });
+      const errMsg =
+        error instanceof Error ? error.message : "Gagal membuat jadwal.";
+      setPesan({ type: "error", text: errMsg });
+      toast(errMsg, "error");
     } finally {
       setLoading(false);
     }
@@ -133,7 +138,7 @@ export default function GenerateJadwalClient({
 
       <button
         type="button"
-        onClick={() => void handleGenerate()}
+        onClick={requestGenerate}
         disabled={loading || selectedStaff.length < 2 || !siteId}
         className="min-h-10 rounded-lg bg-[#1d4ed8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1e40af] disabled:opacity-50"
       >
@@ -150,6 +155,17 @@ export default function GenerateJadwalClient({
           {pesan.text}
         </p>
       )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Generate Jadwal 8 Minggu?"
+        message="Jadwal kunjungan dalam periode 8 minggu ke depan akan diganti dengan rotasi petugas terpilih. Lanjutkan?"
+        confirmLabel="Ya, Generate Jadwal"
+        cancelLabel="Batal"
+        busy={loading}
+        onConfirm={() => void executeGenerate()}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

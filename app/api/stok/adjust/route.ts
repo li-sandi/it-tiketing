@@ -1,17 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 const ALLOWED_ROLES = new Set(["ga", "it", "admin"]);
+const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
+
+function jsonError(error: string, status: number) {
+  return NextResponse.json({ error }, { status, headers: NO_STORE_HEADERS });
+}
 
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      if (new URL(origin).origin !== new URL(request.url).origin) {
+        return jsonError("Asal permintaan tidak diizinkan.", 403);
+      }
+    } catch {
+      return jsonError("Header asal permintaan tidak valid.", 403);
+    }
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Autentikasi diperlukan." }, { status: 401 });
+    return jsonError("Autentikasi diperlukan.", 401);
   }
 
   const { data: profile } = await supabase
@@ -21,9 +37,9 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (!profile || !ALLOWED_ROLES.has(profile.peran)) {
-    return NextResponse.json(
-      { error: "Hanya GA, IT, atau Admin yang dapat memperbarui stok." },
-      { status: 403 },
+    return jsonError(
+      "Hanya GA, IT, atau Admin yang dapat memperbarui stok.",
+      403,
     );
   }
 
@@ -37,7 +53,7 @@ export async function POST(request: NextRequest) {
   try {
     body = (await request.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "Body request tidak valid." }, { status: 400 });
+    return jsonError("Body request tidak valid.", 400);
   }
 
   const kode = String(body.kode ?? "").trim();
@@ -47,14 +63,14 @@ export async function POST(request: NextRequest) {
   const catatan = body.catatan?.trim() || null;
 
   if (!kode || !Number.isFinite(delta) || delta === 0) {
-    return NextResponse.json(
-      { error: "Kode sparepart dan jumlah perubahan stok tidak valid." },
-      { status: 400 },
+    return jsonError(
+      "Kode sparepart dan jumlah perubahan stok tidak valid.",
+      400,
     );
   }
 
   if (jenis !== "masuk" && jenis !== "keluar" && jenis !== "penyesuaian") {
-    return NextResponse.json({ error: "Jenis mutasi tidak valid." }, { status: 400 });
+    return jsonError("Jenis mutasi tidak valid.", 400);
   }
 
   const { data: rpcResult, error: rpcError } = await supabase.rpc(
@@ -70,7 +86,7 @@ export async function POST(request: NextRequest) {
   );
 
   if (rpcError) {
-    return NextResponse.json({ error: rpcError.message }, { status: 400 });
+    return jsonError(rpcError.message, 400);
   }
 
   const result = rpcResult as {
@@ -94,6 +110,7 @@ export async function POST(request: NextRequest) {
     waitingProcurementCount = count ?? 0;
   }
 
+  revalidateTag("stocks", { expire: 0 });
   revalidatePath("/stok");
   revalidatePath("/antrian");
   revalidatePath("/dashboard");
@@ -103,9 +120,12 @@ export async function POST(request: NextRequest) {
     revalidatePath(`/tiket/${ticketId}`);
   }
 
-  return NextResponse.json({
-    ok: true,
-    result,
-    waitingProcurementCount,
-  });
+  return NextResponse.json(
+    {
+      ok: true,
+      result,
+      waitingProcurementCount,
+    },
+    { headers: NO_STORE_HEADERS },
+  );
 }

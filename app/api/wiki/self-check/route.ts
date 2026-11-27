@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { getFeatureFlags } from "@/lib/settings";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function jsonError(error: string, status: number) {
-  return NextResponse.json(
-    { error },
-    { status, headers: { "Cache-Control": "no-store" } },
-  );
+  return NextResponse.json({ error }, { status, headers: NO_STORE_HEADERS });
 }
 
 export async function POST(request: Request) {
@@ -23,7 +24,10 @@ export async function POST(request: Request) {
 
   const flags = await getFeatureFlags();
   if (!flags.ai_self_check_enabled) {
-    return NextResponse.json({ articles: [], aiSummary: null });
+    return NextResponse.json(
+      { articles: [], aiSummary: null },
+      { headers: NO_STORE_HEADERS },
+    );
   }
 
   let payload: unknown;
@@ -40,14 +44,30 @@ export async function POST(request: Request) {
   const deskripsi =
     typeof record.deskripsi === "string" ? record.deskripsi.trim().slice(0, 500) : "";
   const categoryId =
-    typeof record.categoryId === "string" ? record.categoryId : "";
+    typeof record.categoryId === "string" ? record.categoryId.trim() : "";
   const grup = typeof record.grup === "string" ? record.grup.trim() : "";
 
-  if (deskripsi.length < 5 && !categoryId) {
-    return NextResponse.json({ articles: [], aiSummary: null });
+  if (categoryId && !UUID_PATTERN.test(categoryId)) {
+    return jsonError("ID kategori tidak valid.", 400);
   }
 
-  const admin = createAdminClient();
+  if (deskripsi.length < 5 && !categoryId) {
+    return NextResponse.json(
+      { articles: [], aiSummary: null },
+      { headers: NO_STORE_HEADERS },
+    );
+  }
+
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (err) {
+    console.error(
+      "Konfigurasi Supabase admin tidak tersedia untuk self-check wiki:",
+      err instanceof Error ? err.message : err,
+    );
+    return jsonError("Gagal mencari artikel bantuan.", 500);
+  }
   const keywords = deskripsi
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
@@ -69,6 +89,7 @@ export async function POST(request: Request) {
       .from("knowledge_articles")
       .select("id, judul, grup, masalah, solusi")
       .eq("status", "published")
+      .eq("is_internal", false)
       .textSearch("search_vector", query, { type: "websearch" })
       .limit(4);
     articles = data ?? [];
@@ -79,6 +100,7 @@ export async function POST(request: Request) {
       .from("knowledge_articles")
       .select("id, judul, grup, masalah, solusi")
       .eq("status", "published")
+      .eq("is_internal", false)
       .limit(3);
     if (categoryId) fallbackQuery = fallbackQuery.eq("category_id", categoryId);
     else if (grup) fallbackQuery = fallbackQuery.eq("grup", grup);

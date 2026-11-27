@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeWorkloadMetrics, escapeCsvCell } from "@/lib/laporan-metrics";
+import {
+  computeWorkloadMetrics,
+  escapeCsvCell,
+  formatPeriodRange,
+} from "@/lib/laporan-metrics";
 
 describe("laporan metrics and CSV escaping", () => {
   it("neutralizes CSV formula injection characters", () => {
@@ -57,5 +61,39 @@ describe("laporan metrics and CSV escaping", () => {
     expect(metrics.summary.totalPoinKesulitan).toBe(4);
     expect(metrics.workloadByIt.map((r) => r.nama)).toEqual(["Andi", "Zaki"]);
     expect(metrics.workloadByIt[1].totalPoin).toBe(4);
+  });
+
+  it("clamps/fallbacks extreme tahun and kuartal values in formatPeriodRange without RangeError", () => {
+    const fixedNow = new Date("2026-11-26T10:00:00.000Z");
+
+    for (const badYear of [99999999, -1, Infinity, -Infinity, NaN, 2026.5]) {
+      const monthly = formatPeriodRange({
+        periode: "bulanan",
+        tahun: badYear,
+        now: fixedNow,
+      });
+      expect(monthly.start.toISOString()).toBe("2026-10-31T17:00:00.000Z");
+      expect(monthly.end.toISOString()).toBe("2026-11-30T17:00:00.000Z");
+
+      const quarterly = formatPeriodRange({
+        periode: "kuartalan",
+        tahun: badYear,
+        kuartal: 99,
+        now: fixedNow,
+      });
+      expect(quarterly.start.toISOString()).toBe("2026-12-31T17:00:00.000Z".replace("2026-12-31", "2025-12-31"));
+      expect(() => quarterly.end.toISOString()).not.toThrow();
+      expect(quarterly.label).toBe("Q1 2026");
+    }
+
+    const validQ3 = formatPeriodRange({
+      periode: "kuartalan",
+      tahun: 2025,
+      kuartal: 3,
+      now: fixedNow,
+    });
+    expect(validQ3.start.toISOString()).toBe("2025-06-30T17:00:00.000Z");
+    expect(validQ3.end.toISOString()).toBe("2025-09-30T17:00:00.000Z");
+    expect(validQ3.label).toBe("Q3 2025");
   });
 });

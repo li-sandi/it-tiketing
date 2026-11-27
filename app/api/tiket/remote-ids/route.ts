@@ -67,7 +67,16 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const admin = createAdminClient();
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (err) {
+    console.error(
+      "Konfigurasi Supabase admin tidak tersedia untuk lookup ID remote:",
+      err instanceof Error ? err.message : err,
+    );
+    return jsonError("Gagal mencari ID remote untuk aset.", 500);
+  }
   const { data: assetRecord } = await admin
     .from("assets")
     .select("nama_perangkat, ram_gb, anydesk_id, uv_id")

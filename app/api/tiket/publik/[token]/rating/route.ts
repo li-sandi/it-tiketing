@@ -51,7 +51,16 @@ export async function POST(
     return responseError("Rating harus berupa angka 1-5.", 400);
   }
 
-  const admin = createAdminClient();
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (err) {
+    console.error(
+      "Konfigurasi Supabase admin tidak tersedia untuk rating tiket:",
+      err instanceof Error ? err.message : err,
+    );
+    return responseError("Gagal menutup tiket. Silakan coba lagi.", 500);
+  }
   const { data: closed, error } = await admin.rpc("close_public_ticket", {
     p_access_token: token,
     p_rating: payload.rating,

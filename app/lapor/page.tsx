@@ -1,39 +1,82 @@
+import { Suspense } from "react";
 import Link from "next/link";
-import { connection } from "next/server";
 import PublicHeader from "@/components/layout/PublicHeader";
 import PublicTicketForm from "@/components/tiket/PublicTicketForm";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getActiveCategories } from "@/lib/data/categories";
+import { getActiveSites } from "@/lib/data/sites";
+import { getInventoryStocks } from "@/lib/data/stocks";
 
-export const instant = false;
+function LaporFormSkeleton() {
+  return (
+    <div className="animate-pulse space-y-4">
+      <div className="h-10 rounded-lg bg-[var(--surface-muted)]" />
+      <div className="h-10 rounded-lg bg-[var(--surface-muted)]" />
+      <div className="h-28 rounded-lg bg-[var(--surface-muted)]" />
+      <div className="h-24 rounded-lg bg-[var(--surface-muted)]" />
+      <div className="h-10 rounded-lg bg-[var(--surface-muted)]" />
+    </div>
+  );
+}
 
-export default async function PublicReportPage() {
-  await connection();
-  const admin = createAdminClient();
-  const [
-    { data: categories, error: categoriesError },
-    { data: sites, error: sitesError },
-    { data: stocks },
-  ] = await Promise.all([
-    admin
-      .from("categories")
-      .select(
-        "id, nama, grup, tipe, prioritas_default, prioritas_naik, butuh_aset, butuh_foto, bisa_remote, stock_kode",
-      )
-      .eq("aktif", true)
-      .neq("tipe", "internal")
-      .order("grup")
-      .order("nama"),
-    admin
-      .from("sites")
-      .select("id, nama, jumlah_user")
-      .eq("aktif", true)
-      .order("nama"),
-    admin
-      .from("inventory_stocks")
-      .select("id, kode, nama, satuan, jumlah_stok, stok_minimum, catatan")
-      .order("nama"),
+async function PublicReportFormLoader() {
+  const [categoriesResult, sitesResult, stocksResult] = await Promise.allSettled([
+    getActiveCategories({ includeInternal: false }),
+    getActiveSites(),
+    getInventoryStocks(),
   ]);
 
+  if (categoriesResult.status === "rejected") {
+    const message =
+      categoriesResult.reason instanceof Error
+        ? categoriesResult.reason.message
+        : "Terjadi kesalahan saat memuat kategori.";
+    return (
+      <p
+        role="alert"
+        className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+      >
+        Gagal memuat kategori: {message}
+      </p>
+    );
+  }
+
+  if (sitesResult.status === "rejected") {
+    const message =
+      sitesResult.reason instanceof Error
+        ? sitesResult.reason.message
+        : "Terjadi kesalahan saat memuat site.";
+    return (
+      <p
+        role="alert"
+        className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
+      >
+        Gagal memuat site: {message}
+      </p>
+    );
+  }
+
+  const categories = categoriesResult.value;
+  const sites = sitesResult.value;
+  const stocks = stocksResult.status === "fulfilled" ? stocksResult.value : [];
+
+  if (!categories.length || !sites.length) {
+    return (
+      <p className="rounded-lg border bg-[var(--surface-muted)] p-4 text-sm text-[var(--secondary)]">
+        Kategori aktif atau data site belum tersedia.
+      </p>
+    );
+  }
+
+  return (
+    <PublicTicketForm
+      categories={categories}
+      sites={sites}
+      stocks={stocks}
+    />
+  );
+}
+
+export default function PublicReportPage() {
   return (
     <div className="flex min-h-screen flex-col bg-[var(--background)]">
       <PublicHeader />
@@ -56,31 +99,9 @@ export default async function PublicReportPage() {
             </p>
           </div>
 
-          {categoriesError ? (
-            <p
-              role="alert"
-              className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-            >
-              Gagal memuat kategori: {categoriesError.message}
-            </p>
-          ) : sitesError ? (
-            <p
-              role="alert"
-              className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700"
-            >
-              Gagal memuat site: {sitesError.message}
-            </p>
-          ) : !categories?.length || !sites?.length ? (
-            <p className="rounded-lg border bg-[var(--surface-muted)] p-4 text-sm text-[var(--secondary)]">
-              Kategori aktif atau data site belum tersedia.
-            </p>
-          ) : (
-            <PublicTicketForm
-              categories={categories}
-              sites={sites}
-              stocks={stocks ?? []}
-            />
-          )}
+          <Suspense fallback={<LaporFormSkeleton />}>
+            <PublicReportFormLoader />
+          </Suspense>
         </div>
       </main>
     </div>

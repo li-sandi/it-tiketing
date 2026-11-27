@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 const ALLOWED_ROLES = new Set(["ga", "it", "admin"]);
+const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
+
+function jsonError(error: string, status: number) {
+  return NextResponse.json({ error }, { status, headers: NO_STORE_HEADERS });
+}
 
 export async function GET() {
   const supabase = await createClient();
@@ -11,7 +16,7 @@ export async function GET() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Autentikasi diperlukan." }, { status: 401 });
+    return jsonError("Autentikasi diperlukan.", 401);
   }
 
   const { data: profile } = await supabase
@@ -26,10 +31,7 @@ export async function GET() {
     .order("nama");
 
   if (stocksError) {
-    return NextResponse.json(
-      { error: `Gagal memuat stok sparepart: ${stocksError.message}` },
-      { status: 500 },
-    );
+    return jsonError(`Gagal memuat stok sparepart: ${stocksError.message}`, 500);
   }
 
   let movements: Array<Record<string, unknown>> = [];
@@ -45,21 +47,35 @@ export async function GET() {
     movements = (movementRows ?? []) as Array<Record<string, unknown>>;
   }
 
-  return NextResponse.json({
-    stocks: stocks ?? [],
-    movements,
-    canManage: Boolean(profile?.peran && ALLOWED_ROLES.has(profile.peran)),
-  });
+  return NextResponse.json(
+    {
+      stocks: stocks ?? [],
+      movements,
+      canManage: Boolean(profile?.peran && ALLOWED_ROLES.has(profile.peran)),
+    },
+    { headers: NO_STORE_HEADERS },
+  );
 }
 
 export async function POST(request: NextRequest) {
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      if (new URL(origin).origin !== new URL(request.url).origin) {
+        return jsonError("Asal permintaan tidak diizinkan.", 403);
+      }
+    } catch {
+      return jsonError("Header asal permintaan tidak valid.", 403);
+    }
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return NextResponse.json({ error: "Autentikasi diperlukan." }, { status: 401 });
+    return jsonError("Autentikasi diperlukan.", 401);
   }
 
   const { data: profile } = await supabase
@@ -69,9 +85,9 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (!profile || !ALLOWED_ROLES.has(profile.peran)) {
-    return NextResponse.json(
-      { error: "Hanya GA, IT, atau Admin yang dapat menambah atau mengubah item stok." },
-      { status: 403 },
+    return jsonError(
+      "Hanya GA, IT, atau Admin yang dapat menambah atau mengubah item stok.",
+      403,
     );
   }
 
@@ -79,13 +95,13 @@ export async function POST(request: NextRequest) {
     kode?: string;
     nama?: string;
     satuan?: string;
-    stokMinimum?: number;
+    stokMinimum?: unknown;
     catatan?: string;
   };
   try {
     body = (await request.json()) as typeof body;
   } catch {
-    return NextResponse.json({ error: "Body request tidak valid." }, { status: 400 });
+    return jsonError("Body request tidak valid.", 400);
   }
 
   const kode = String(body.kode ?? "")
@@ -94,14 +110,24 @@ export async function POST(request: NextRequest) {
     .replace(/[^a-z0-9_]/g, "_");
   const nama = String(body.nama ?? "").trim();
   const satuan = String(body.satuan ?? "pcs").trim() || "pcs";
-  const stokMinimum = Math.max(0, Math.floor(Number(body.stokMinimum ?? 2)));
+  let stokMinimum = 2;
+  if (body.stokMinimum !== undefined && body.stokMinimum !== null) {
+    if (
+      typeof body.stokMinimum !== "number" ||
+      !Number.isInteger(body.stokMinimum) ||
+      body.stokMinimum < 0
+    ) {
+      return jsonError(
+        "Stok minimum harus berupa bilangan bulat non-negatif.",
+        400,
+      );
+    }
+    stokMinimum = body.stokMinimum;
+  }
   const catatan = body.catatan?.trim() || null;
 
   if (!kode || kode.length < 2 || !nama) {
-    return NextResponse.json(
-      { error: "Kode dan nama sparepart wajib diisi." },
-      { status: 400 },
-    );
+    return jsonError("Kode dan nama sparepart wajib diisi.", 400);
   }
 
   const { data, error } = await supabase
@@ -122,15 +148,13 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) {
-    return NextResponse.json(
-      { error: `Gagal menyimpan item stok: ${error.message}` },
-      { status: 500 },
-    );
+    return jsonError(`Gagal menyimpan item stok: ${error.message}`, 500);
   }
 
+  revalidateTag("stocks", { expire: 0 });
   revalidatePath("/stok");
   revalidatePath("/tiket/baru");
   revalidatePath("/lapor");
 
-  return NextResponse.json({ stock: data });
+  return NextResponse.json({ stock: data }, { headers: NO_STORE_HEADERS });
 }

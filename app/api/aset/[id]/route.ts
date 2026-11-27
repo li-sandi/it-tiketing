@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -99,6 +100,8 @@ export async function PATCH(
   const { error } = await admin.from("assets").update(updates).eq("id", id);
   if (error) return jsonError(`Gagal memperbarui aset: ${error.message}`, 400);
 
+  revalidateTag("assets", { expire: 0 });
+
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -126,6 +129,8 @@ export async function DELETE(
   const admin = createAdminClient();
   const { error } = await admin.from("assets").delete().eq("id", id);
   if (error) return jsonError("Gagal menghapus aset.", 500);
+
+  revalidateTag("assets", { expire: 0 });
 
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }

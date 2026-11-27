@@ -4,6 +4,35 @@ Seluruh perubahan signifikan pada proyek **IT Ticketing** dicatat pada berkas in
 
 ---
 
+## [2026-11-26] — Optimasi Performa Navigasi, Cache Components, E2E & Tier-5
+
+### Ditambahkan & Diubah (Added & Changed)
+- **Arsitektur Caching, Proxy & Data Access Layer (M1):**
+  - `proxy.ts` & `lib/__tests__/proxy.test.ts` — batas jaringan Node.js ringan yang melewati pemanggilan Supabase saat cookie `sb-*-auth-token` tidak ada (nol overhead untuk rute publik), memakai `supabase.auth.getClaims()` untuk validasi/refresh sesi tanpa query DB aplikasi, dan menjaga fallback aman bila env publik Supabase belum diset.
+  - `lib/auth.ts` & `lib/__tests__/auth.test.ts` — DAL autentikasi terpusat menggunakan `React.cache()` + `"use cache: private"` (`stale: 60s`) untuk `getCurrentUserSession()` dan `getCurrentUserProfile()` (dengan helper internal `"use cache"` bertag `users` & `user-profile:${userId}`), serta `requireAuthUser()` (`getUser()`) ketat untuk mutasi/Server Actions.
+  - `lib/settings.ts` & `lib/__tests__/settings.test.ts` — konsolidasi 4 query tabel `settings` menjadi 1 pembacaan `"use cache"` (`cacheLife("hours")`, `cacheTag("settings")`) cookie-free serta perlindungan terhadap payload `__proto__`.
+  - `lib/data/{categories,sites,stocks,wiki,assets,users,schedule}.ts` & `lib/__tests__/data-cache.test.ts` — lapisan data referensi bercache (`"use cache"`, `cacheTag`, `cacheLife`) dan invalidasi `revalidateTag(..., { expire: 0 })` pada endpoint mutasi (`app/api/admin/*`, `app/api/aset*`, `app/api/stok*`, `app/api/wiki*`, `app/api/telegram/sync`).
+  - `components/layout/AppShell.tsx` — tombol *Keluar* melakukan full navigation (`window.location.href = "/login"`) untuk mereset state `<Activity>` di sisi klien.
+- **Shared App Shell, Partial Prerendering & Streaming (M2):**
+  - `app/(app)/layout.tsx` & pemindahan seluruh rute terautentikasi ke route group `app/(app)/*` — `AppShellFrame` dipasang sekali agar sidebar dan top bar tetap menempel saat berpindah halaman tanpa double-mount di `app/(app)/admin/layout.tsx`, dengan slot dinamis di balik `<Suspense>`.
+  - Penghapusan `export const instant = false` dan `await connection()` top-level, paralelisasi query (`Promise.all` / `Promise.allSettled`), streaming panel sekunder (`/tiket/[id]`, `/status/[token]` tanpa waterfall `useEffect`), penambahan `loading.tsx` di `/aset`, `/wiki`, `/lapor`, dan `/admin`, serta pemakaian `next/form` `<Form>` untuk filter soft navigation di `/tiket` dan `/laporan`.
+- **Perbaikan Bug & Hardening Tier-5 (M3):**
+  - `components/tiket/PublicTicketForm.tsx` & `components/tiket/TicketForm.tsx` — reset `loading` dan input form saat submit berhasil serta `useLayoutEffect` cleanup sesuai panduan `<Activity>` agar tombol submit tidak pernah tertinggal disabled `"Mengirim..."` saat kembali lewat `<Link>`.
+  - `app/status/[token]/page.tsx`, `app/(app)/tiket/page.tsx`, `app/api/tiket/publik/route.ts`, `app/api/tiket/publik/[token]/route.ts`, `app/api/tiket/publik/[token]/rating/route.ts`, `app/api/tiket/remote-ids/route.ts`, dan `app/api/wiki/self-check/route.ts` — pembungkusan `createAdminClient()` dalam `try/catch` agar ketiadaan `SUPABASE_SERVICE_ROLE_KEY` merender UI error/JSON `500` (`Cache-Control: no-store`) secara anggun tanpa React error #441.
+  - `lib/laporan-metrics.ts`, `app/(app)/laporan/page.tsx`, dan `app/api/laporan/export/route.ts` — validasi/normalisasi batas `tahun` (`2000–2100`) dan `kuartal` (`1–4`) mencegah `RangeError: Invalid time value`.
+  - `app/api/telegram/sync/route.ts` — memindahkan `revalidateTag("user-profile:...")` dan `revalidateTag("users")` tepat setelah `redemption.result === "linked"` sebelum `kirimPesan()` agar cache tetap terinvalidasi meski API Telegram gagal.
+  - `app/api/notifications/subscribe/route.ts` (`DELETE`), `app/api/stok/route.ts` (`POST`), `app/api/stok/adjust/route.ts` (`POST`), `app/api/tiket/lampiran/route.ts` (`POST`), `app/api/notif/tiket-baru/route.ts` (`POST`), `app/api/telegram/link/route.ts` (`POST`), dan `app/api/telegram/sync/route.ts` (`POST`) — penegakan pemeriksaan CSRF `Origin` (`403`) dan header `Cache-Control: no-store`.
+- **Suite Pengujian E2E & Adversarial Tier-5:**
+  - `vitest.e2e.config.ts` & `tests/e2e/{helpers/*,tier1-route-reachability-auth,tier2-boundary-and-errors,tier3-cross-feature-rsc-flows,tier4-browser-scenarios}.test.ts` — cakupan penuh 20 rute aplikasi, matriks proteksi 35/35 endpoint API non-cron, validasi boundary/CSRF/PPR, dan skenario browser CDP headless.
+  - `lib/__tests__/actions.test.ts` & `lib/__tests__/api-hardening.test.ts` serta perluasan `auth.test.ts`, `settings.test.ts`, dan `laporan.test.ts`.
+
+### Ringkasan Benchmark Performa (Before F1 vs After M3)
+- **Klasifikasi Build (`next build`):** Rute halaman `ƒ Dynamic` turun dari `10` menjadi **`0`** (`4` `○ Static` termasuk `/lapor`, `17` `◐ Partial Prerender`).
+- **Transisi Browser Headless (`/` → `/lapor`):** Cold `13.179 ms` → **`82,5 ms`** (`-99,4%`, `0` request saat klik); Warm `2.685 ms` → **`25,9 ms`** (`-99,0%`).
+- **HTTP Document & RSC (`/lapor`, `/admin/pengaturan`):** Document `/lapor` cold `4.343,6 ms` → **`225,9 ms`** (`-94,8%`), warm `499,3 ms` → **`23,4 ms`** (`-95,3%`); Document `/admin/pengaturan` warm `1.092,8 ms` → **`44,7 ms`** (`-95,9%`).
+
+---
+
 ## [2026-11-26] — Penguatan Keamanan, Audit Admin, Peningkatan UX, & CI
 
 ### Ditambahkan & Diubah (Added & Changed)

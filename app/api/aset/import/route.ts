@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { parseAssetsCsv } from "@/lib/aset-csv";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -83,6 +83,7 @@ export async function POST(request: Request) {
     );
   }
 
+  revalidateTag("assets", { expire: 0 });
   revalidatePath("/aset");
 
   return NextResponse.json(

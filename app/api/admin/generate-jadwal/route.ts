@@ -1,4 +1,6 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
+import { logAdminAction } from "@/lib/admin-audit";
 import { getAdminUser } from "@/lib/admin-auth";
 import { addDaysToDate, getNextScheduleStartDate } from "@/lib/jadwal-sleman";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -114,8 +116,26 @@ export async function POST(request: Request) {
     return jsonError("Jumlah jadwal yang tersimpan tidak sesuai.", 500);
   }
 
+  revalidateTag("schedule", { expire: 0 });
+
+  const sampai = addDaysToDate(endDate, -1);
+  await logAdminAction({
+    aktorId: adminUser.user.id,
+    aksi: "create",
+    entitas: "jadwal",
+    entitasId: targetSite.id,
+    ringkasan: `Generate ${jumlah} jadwal kunjungan (${startDate} s.d. ${sampai})`,
+    detail: {
+      site_id: targetSite.id,
+      staff_ids: orderedStaffIds,
+      mulai: startDate,
+      sampai,
+      jumlah,
+    },
+  });
+
   return NextResponse.json(
-    { ok: true, jumlah, mulai: startDate, sampai: addDaysToDate(endDate, -1) },
+    { ok: true, jumlah, mulai: startDate, sampai },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

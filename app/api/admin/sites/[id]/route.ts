@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { logAdminAction } from "@/lib/admin-audit";
 import { getAdminUser } from "@/lib/admin-auth";
@@ -80,6 +81,8 @@ export async function PATCH(
   const admin = createAdminClient();
   const { error } = await admin.from("sites").update(updates).eq("id", id);
   if (error) return jsonError("Gagal memperbarui site.", 500);
+
+  revalidateTag("sites", { expire: 0 });
 
   await logAdminAction({
     aktorId: adminUser.user.id,

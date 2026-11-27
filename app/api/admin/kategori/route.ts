@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { logAdminAction } from "@/lib/admin-audit";
 import { getAdminUser } from "@/lib/admin-auth";
@@ -108,6 +109,8 @@ export async function POST(request: Request) {
     console.error("Gagal menambah kategori:", error.message);
     return jsonError("Gagal menambah kategori.", 500);
   }
+
+  revalidateTag("categories", { expire: 0 });
 
   await logAdminAction({
     aktorId: adminUser.user.id,

@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import CategoryGroupSelector, {
   type CategoryOption,
@@ -52,6 +58,42 @@ export default function PublicTicketForm({
   const [requestUpgradeRam, setRequestUpgradeRam] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const shouldResetRef = useRef(false);
+
+  const resetFormState = useCallback(() => {
+    setNama("");
+    setKontak("");
+    setSiteId(singleSite?.id ?? "");
+    setCategoryId("");
+    setDeskripsi("");
+    setJumlahUser("");
+    setJumlahTask("");
+    setNomorAset("");
+    setPenanganan("onsite");
+    setAnydeskId("");
+    setAnydeskPassword("");
+    setUvId("");
+    setUvPassword("");
+    setRemoteFile(null);
+    setFile(null);
+    setRamWarning(null);
+    setRequestUpgradeRam(false);
+    setError(null);
+    setLoading(false);
+    formRef.current?.reset();
+  }, [singleSite?.id]);
+
+  useLayoutEffect(() => {
+    return () => {
+      if (shouldResetRef.current) {
+        shouldResetRef.current = false;
+        resetFormState();
+      } else {
+        setLoading(false);
+      }
+    };
+  }, [resetFormState]);
 
   const category = categories.find((item) => item.id === categoryId);
   const rule = parseAturanKenaikan(category?.prioritas_naik);
@@ -62,10 +104,9 @@ export default function PublicTicketForm({
     (category?.nama ?? "").startsWith("Masalah VPN");
   const needsTaskCount = rule?.tipe === "jumlah_task";
   const stocksByKode = Object.fromEntries(stocks.map((s) => [s.kode, s]));
-  const stockCheck = resolveInitialTicketStockState(
-    category?.stock_kode,
-    stocksByKode,
-  );
+  const stockCheck = category?.stock_kode
+    ? resolveInitialTicketStockState(category.stock_kode, stocksByKode)
+    : null;
 
   const handleAssetDetected = useCallback(
     (info: { ramGb: number | null; assetName: string | null }) => {
@@ -154,6 +195,8 @@ export default function PublicTicketForm({
           storageError,
         );
       }
+      shouldResetRef.current = true;
+      resetFormState();
       router.push(`/status/${result.token}`);
     } catch (submitError) {
       setError(
@@ -166,7 +209,7 @@ export default function PublicTicketForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
       <div>
         <label htmlFor="public-name" className="mb-1 block text-sm font-medium">
           Nama
@@ -256,7 +299,7 @@ export default function PublicTicketForm({
         />
       )}
 
-      {category?.stock_kode && (
+      {category?.stock_kode && stockCheck && (
         <div
           className={`rounded-xl border p-3.5 text-sm ${
             stockCheck.needsProcurement

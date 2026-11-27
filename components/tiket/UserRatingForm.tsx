@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { tutupTiketOlehUser } from "@/app/tiket/[id]/actions";
+import { tutupTiketOlehUser } from "@/app/(app)/tiket/[id]/actions";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/components/ui/ToastProvider";
 

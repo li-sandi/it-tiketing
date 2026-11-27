@@ -1,12 +1,29 @@
 import { createHash, randomUUID } from "node:crypto";
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { ambilUpdate, escapeHtml, kirimPesan } from "@/lib/telegram";
 
 const startPattern = /^\/start(?:@[A-Za-z0-9_]+)?(?:\s+([A-Za-z0-9_-]{43}))?$/;
+const NO_STORE_HEADERS = { "Cache-Control": "no-store" };
 
-export async function POST() {
+function jsonError(error: string, status: number) {
+  return NextResponse.json({ error }, { status, headers: NO_STORE_HEADERS });
+}
+
+export async function POST(request: Request) {
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      if (new URL(origin).origin !== new URL(request.url).origin) {
+        return jsonError("Asal permintaan tidak diizinkan.", 403);
+      }
+    } catch {
+      return jsonError("Header asal permintaan tidak valid.", 403);
+    }
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -14,7 +31,7 @@ export async function POST() {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    return jsonError("Belum login.", 401);
   }
 
   let admin: ReturnType<typeof createAdminClient>;
@@ -30,9 +47,9 @@ export async function POST() {
       throw new Error(`Gagal mengunci polling bot: ${lockError.message}`);
     }
     if (!claimed) {
-      return NextResponse.json(
-        { error: "Polling Telegram sedang berjalan. Coba lagi sebentar." },
-        { status: 409 },
+      return jsonError(
+        "Polling Telegram sedang berjalan. Coba lagi sebentar.",
+        409,
       );
     }
 
@@ -104,6 +121,9 @@ export async function POST() {
               }
 
               if (redemption.result === "linked") {
+                revalidateTag(`user-profile:${user.id}`, { expire: 0 });
+                revalidateTag("users", { expire: 0 });
+                terhubung++;
                 const name =
                   typeof redemption.user_name === "string"
                     ? escapeHtml(redemption.user_name)
@@ -112,7 +132,6 @@ export async function POST() {
                   message.chat.id,
                   `Berhasil terhubung sebagai <b>${name}</b>.`,
                 );
-                terhubung++;
               } else if (redemption.result === "already_linked") {
                 const name =
                   typeof redemption.user_name === "string"
@@ -148,12 +167,15 @@ export async function POST() {
         lastId = update.update_id;
       }
 
-      return NextResponse.json({
-        ok: true,
-        terhubung,
-        totalUpdate: updates.length,
-        lastUpdateId: lastId,
-      });
+      return NextResponse.json(
+        {
+          ok: true,
+          terhubung,
+          totalUpdate: updates.length,
+          lastUpdateId: lastId,
+        },
+        { headers: NO_STORE_HEADERS },
+      );
     } finally {
       const { error: releaseError } = await admin.rpc("release_telegram_poll", {
         p_lock_id: lockId,
@@ -166,6 +188,6 @@ export async function POST() {
     const message =
       error instanceof Error ? error.message : "Terjadi kesalahan Telegram.";
     console.error("Telegram sync gagal:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return jsonError(message, 500);
   }
 }

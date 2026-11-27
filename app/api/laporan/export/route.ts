@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { loadReportData } from "@/lib/laporan";
-import { escapeCsvCell, type ReportPeriod } from "@/lib/laporan-metrics";
+import {
+  escapeCsvCell,
+  normalizeReportQuarter,
+  normalizeReportYear,
+  type ReportPeriod,
+} from "@/lib/laporan-metrics";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
@@ -9,16 +14,28 @@ export async function GET(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ error: "Belum login." }, { status: 401 });
+    return NextResponse.json(
+      { error: "Belum login." },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("users")
     .select("peran")
     .eq("id", user.id)
     .maybeSingle();
+  if (profileError) {
+    return NextResponse.json(
+      { error: "Gagal memeriksa profil pengguna." },
+      { status: 500, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   if (profile?.peran !== "it" && profile?.peran !== "admin") {
-    return NextResponse.json({ error: "Akses staf IT/admin diperlukan." }, { status: 403 });
+    return NextResponse.json(
+      { error: "Akses staf IT/admin diperlukan." },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
+    );
   }
 
   const params = new URL(request.url).searchParams;
@@ -27,8 +44,11 @@ export async function GET(request: Request) {
     rawPeriod === "mingguan" || rawPeriod === "bulanan" || rawPeriod === "kuartalan"
       ? rawPeriod
       : "bulanan";
-  const tahun = Number(params.get("tahun")) || new Date().getUTCFullYear();
-  const kuartal = Number(params.get("kuartal")) || 1;
+  const tahun = normalizeReportYear(
+    params.get("tahun"),
+    new Date().getUTCFullYear(),
+  );
+  const kuartal = normalizeReportQuarter(params.get("kuartal"));
 
   const report = await loadReportData({ periode, tahun, kuartal });
   const header = [

@@ -15,6 +15,8 @@ WHERE n.nspname = 'public'
   AND c.relkind = 'r'
   AND c.relname IN (
     'tickets',
+    'ticket_comments',
+    'in_app_notifications',
     'remote_credentials',
     'inventory_stocks',
     'stock_movements',

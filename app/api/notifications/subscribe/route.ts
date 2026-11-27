@@ -57,7 +57,18 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      if (new URL(origin).origin !== new URL(request.url).origin) {
+        return jsonError("Asal permintaan tidak diizinkan.", 403);
+      }
+    } catch {
+      return jsonError("Header asal permintaan tidak valid.", 403);
+    }
+  }
+
   const supabase = await createClient();
   const {
     data: { user },

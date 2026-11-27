@@ -283,7 +283,9 @@ a.bg-black:hover {
 
 :root[data-theme="dark"] [class~="text-red-600"],
 :root[data-theme="dark"] [class~="text-red-700"],
-:root[data-theme="dark"] [class~="text-red-800"] {
+:root[data-theme="dark"] [class~="text-red-800"],
+:root[data-theme="dark"] [class~="text-red-900"],
+:root[data-theme="dark"] [class~="text-red-950"] {
   color: var(--danger-text);
 }
 
@@ -304,6 +306,10 @@ a.bg-black:hover {
 :root[data-theme="dark"] [class~="text-green-600"],
 :root[data-theme="dark"] [class~="text-green-700"],
 :root[data-theme="dark"] [class~="text-green-800"],
+:root[data-theme="dark"] [class~="text-green-900"],
+:root[data-theme="dark"] [class~="text-green-950"],
+:root[data-theme="dark"] [class~="text-emerald-600"],
+:root[data-theme="dark"] [class~="text-emerald-700"],
 :root[data-theme="dark"] [class~="text-emerald-800"],
 :root[data-theme="dark"] [class~="text-emerald-900"],
 :root[data-theme="dark"] [class~="text-emerald-950"] {
@@ -328,12 +334,63 @@ a.bg-black:hover {
   border-color: var(--warning-border);
 }
 
+:root[data-theme="dark"] [class~="text-yellow-700"],
 :root[data-theme="dark"] [class~="text-yellow-800"],
+:root[data-theme="dark"] [class~="text-yellow-900"],
 :root[data-theme="dark"] [class~="text-yellow-950"],
+:root[data-theme="dark"] [class~="text-amber-600"],
 :root[data-theme="dark"] [class~="text-amber-700"],
 :root[data-theme="dark"] [class~="text-amber-800"],
 :root[data-theme="dark"] [class~="text-amber-900"],
 :root[data-theme="dark"] [class~="text-amber-950"] {
+  color: var(--warning-text);
+}
+
+:root[data-theme="dark"] .border-slate-100,
+:root[data-theme="dark"] .border-gray-100 {
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] [class~="border-orange-200"],
+:root[data-theme="dark"] [class~="border-orange-300"] {
+  border-color: #9a3412;
+}
+
+:root[data-theme="dark"] [class~="border-purple-200"],
+:root[data-theme="dark"] [class~="border-purple-300"] {
+  border-color: #6b21a8;
+}
+
+:root[data-theme="dark"] [class~="hover:bg-blue-50"]:hover,
+:root[data-theme="dark"] [class~="hover:bg-blue-100"]:hover {
+  background-color: #1e3a8a;
+}
+
+:root[data-theme="dark"] [class~="hover:bg-red-100"]:hover {
+  background-color: #4c1d24;
+}
+
+:root[data-theme="dark"] [class~="hover:bg-emerald-100"]:hover {
+  background-color: #143d30;
+}
+
+:root[data-theme="dark"] [class~="hover:bg-amber-50/50"]:hover,
+:root[data-theme="dark"] [class~="hover:bg-amber-100"]:hover {
+  background-color: #453317;
+}
+
+:root[data-theme="dark"] [class~="hover:bg-slate-200"]:hover {
+  background-color: var(--border);
+}
+
+:root[data-theme="dark"] [class~="hover:text-blue-700"]:hover,
+:root[data-theme="dark"] [class~="hover:text-blue-800"]:hover,
+:root[data-theme="dark"] [class~="hover:text-blue-950"]:hover {
+  color: var(--info-text);
+}
+
+:root[data-theme="dark"] [class~="hover:text-amber-900"]:hover,
+:root[data-theme="dark"] [class~="hover:text-amber-950"]:hover {
   color: var(--warning-text);
 }
 
@@ -366,6 +423,10 @@ a.bg-black:hover {
   color: #fbcfe8;
 }
 
+.print-only {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -373,5 +434,57 @@ a.bg-black:hover {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
     transform: none !important;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  :root,
+  :root[data-theme="dark"] {
+    color-scheme: light;
+    --background: #ffffff;
+    --surface: #ffffff;
+    --surface-muted: #f8fafc;
+    --foreground: #0f172a;
+    --secondary: #334155;
+    --muted: #475569;
+    --border: #cbd5e1;
+    --border-strong: #94a3b8;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  aside,
+  nav,
+  header:not(.print-keep),
+  .no-print,
+  [data-print-hide="true"],
+  [aria-live="polite"] {
+    display: none !important;
+  }
+
+  [class*="lg:pl-60"] {
+    padding-left: 0 !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  * {
+    box-shadow: none !important;
+  }
+
+  tr,
+  .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

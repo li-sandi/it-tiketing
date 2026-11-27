@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import BrandMark from "@/components/layout/BrandMark";
 import ThemeToggle from "@/components/theme/ThemeToggle";
 import { createClient } from "@/lib/supabase/client";
@@ -22,6 +22,96 @@ type NavItem = {
     | "box"
     | "shield";
 };
+
+export type AppRouteMeta = {
+  title: string;
+  subtitle?: string;
+  action?: {
+    href: string;
+    label: string;
+    primary?: boolean;
+  };
+};
+
+export function getAppRouteMeta(pathname: string, role?: string): AppRouteMeta {
+  if (pathname === "/dashboard") {
+    return {
+      title: "Dashboard",
+      subtitle:
+        "Ringkasan tiket, status penanganan, dan integrasi notifikasi layanan IT Debito Jogja.",
+      action: { href: "/tiket/baru", label: "Buat Tiket Baru", primary: true },
+    };
+  }
+  if (pathname === "/antrian") {
+    return {
+      title: "Antrian IT",
+      subtitle:
+        "Kelola antrian masuk berdasarkan prioritas SLA, pengadaan sparepart, dan tiket aktif Anda.",
+      action: { href: "/stok", label: "Cek Stok Sparepart" },
+    };
+  }
+  if (pathname === "/tiket") {
+    return {
+      title: "Tiket Aktif",
+      subtitle:
+        "Daftar seluruh tiket operasional yang sedang berjalan, diurutkan dari prioritas tertinggi.",
+      action: { href: "/tiket/baru", label: "Buat Tiket Baru", primary: true },
+    };
+  }
+  if (pathname === "/tiket/baru") {
+    return {
+      title: "Buat Tiket Baru",
+      subtitle:
+        "Pilih kelompok kategori dan jelaskan kendala agar tim IT dapat segera menindaklanjuti.",
+      action: { href: "/tiket", label: "Daftar Tiket" },
+    };
+  }
+  if (pathname.startsWith("/tiket/")) {
+    const isStaff = role === "it" || role === "admin";
+    return {
+      title: "Detail Tiket",
+      action: isStaff
+        ? { href: "/antrian", label: "Kembali ke Antrian" }
+        : { href: "/tiket", label: "Daftar Tiket" },
+    };
+  }
+  if (pathname === "/aset") {
+    return {
+      title: "Inventaris Aset IT",
+      subtitle:
+        "Kelola nomor aset, kapasitas RAM (deteksi kandidat upgrade ≤4 GB), dan ID remote statis.",
+    };
+  }
+  if (pathname === "/stok") {
+    const isStaff = role === "it" || role === "admin";
+    return {
+      title: "Stok Sparepart & Pengadaan",
+      subtitle:
+        "Pantau dan perbarui stok RAM, Headset, Mouse, Kabel Power, serta Charger Laptop.",
+      action: isStaff ? { href: "/antrian", label: "Antrian IT" } : undefined,
+    };
+  }
+  if (pathname === "/wiki") {
+    return {
+      title: "Wiki & SOP Layanan IT",
+      subtitle:
+        "Panduan penyelesaian mandiri dan dokumentasi solusi standar operasional.",
+    };
+  }
+  if (pathname === "/laporan") {
+    return {
+      title: "Laporan & Beban Kerja IT",
+    };
+  }
+  if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+    return {
+      title: "Admin Panel",
+      subtitle:
+        "Pengelolaan konfigurasi sistem, kategori layanan, site, pengguna, dan audit.",
+    };
+  }
+  return { title: "IT Service Desk" };
+}
 
 const OPERATIONAL_NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
@@ -115,29 +205,161 @@ function NavIcon({ name }: { name: NavItem["icon"] }) {
   }
 }
 
-export default function AppShell({
-  userName,
-  userEmail,
-  role,
-  pageTitle,
-  pageSubtitle,
-  headerAction,
-  showSchedule = false,
-  children,
-}: {
+export type AppShellNavProps = {
   userName: string;
   userEmail?: string | null;
   role: string;
-  pageTitle: string;
-  pageSubtitle?: string;
-  headerAction?: ReactNode;
   showSchedule?: boolean;
-  children: ReactNode;
-}) {
+};
+
+function AppShellNavBody({
+  userName,
+  userEmail,
+  role,
+  showSchedule = false,
+  onNavigate,
+}: AppShellNavProps & { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [openForPath, setOpenForPath] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      window.location.href = "/login";
+    } catch {
+      setSigningOut(false);
+    }
+  }
+
+  function isVisible(item: NavItem) {
+    if (item.href === "/admin/jadwal" && !showSchedule) return false;
+    return !item.roles || item.roles.includes(role);
+  }
+
+  function isActive(href: string) {
+    if (href === "/tiket") {
+      return (
+        pathname === "/tiket" ||
+        (pathname.startsWith("/tiket/") && pathname !== "/tiket/baru")
+      );
+    }
+    return pathname === href;
+  }
+
+  const operationalLinks = OPERATIONAL_NAV.filter(isVisible);
+  const inventoryLinks = INVENTORY_NAV.filter(isVisible);
+  const adminLinks = ADMIN_NAV.filter(isVisible);
+  const initials = (userName || "U")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+
+  const renderSection = (title: string, items: NavItem[]) => {
+    if (!items.length) return null;
+    return (
+      <div className="space-y-1">
+        <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+          {title}
+        </p>
+        <ul className="space-y-0.5">
+          {items.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  onNavigate={onNavigate}
+                  aria-current={active ? "page" : undefined}
+                  className={`relative flex min-h-9 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm ${
+                    active
+                      ? "bg-blue-50 font-semibold text-blue-700"
+                      : "text-[var(--secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
+                  }`}
+                >
+                  {active && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-blue-700"
+                    />
+                  )}
+                  <NavIcon name={item.icon} />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <nav
+        aria-label="Menu Utama"
+        className="flex-1 space-y-5 overflow-y-auto px-3 py-4"
+      >
+        {renderSection("Operasional", operationalLinks)}
+        {renderSection("Inventaris & Stok", inventoryLinks)}
+        {renderSection("Administrasi", adminLinks)}
+      </nav>
+
+      <div className="border-t p-3">
+        <div className="flex items-center gap-2.5 rounded-lg bg-[var(--surface-muted)] px-2.5 py-2">
+          <div
+            aria-hidden="true"
+            className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#1d4ed8] text-xs font-semibold text-white"
+          >
+            {initials || "U"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold text-[var(--foreground)]">
+              {userName}
+            </p>
+            <p className="truncate text-[11px] text-[var(--muted)]">
+              <span className="font-semibold uppercase">{role}</span>
+              {userEmail ? ` · ${userEmail}` : ""}
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => void handleSignOut()}
+          disabled={signingOut}
+          className="mt-2 flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)] disabled:opacity-50"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="size-3.5"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"
+            />
+          </svg>
+          {signingOut ? "Keluar..." : "Keluar"}
+        </button>
+      </div>
+    </>
+  );
+}
+
+export function AppShellSidebar(props: AppShellNavProps) {
+  return <AppShellNavBody {...props} />;
+}
+
+export function AppShellMobileDrawer(props: AppShellNavProps) {
+  const pathname = usePathname();
+  const [openForPath, setOpenForPath] = useState<string | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const drawerOpen = openForPath === pathname;
 
@@ -153,135 +375,28 @@ export default function AppShell({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [drawerOpen]);
 
-  async function handleSignOut() {
-    setSigningOut(true);
-    try {
-      const supabase = createClient();
-      await supabase.auth.signOut();
-      router.push("/login");
-      router.refresh();
-    } catch {
-      setSigningOut(false);
-    }
-  }
-
-  function isVisible(item: NavItem) {
-    if (item.href === "/admin/jadwal" && !showSchedule) return false;
-    return !item.roles || item.roles.includes(role);
-  }
-
-  function isActive(href: string) {
-    if (href === "/tiket") {
-      return pathname === "/tiket" || (pathname.startsWith("/tiket/") && pathname !== "/tiket/baru");
-    }
-    return pathname === href;
-  }
-
-  const operationalLinks = OPERATIONAL_NAV.filter(isVisible);
-  const inventoryLinks = INVENTORY_NAV.filter(isVisible);
-  const adminLinks = ADMIN_NAV.filter(isVisible);
-  const initials = (userName || "U")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
-
-  function renderNavContent() {
-    const renderSection = (title: string, items: NavItem[]) => {
-      if (!items.length) return null;
-      return (
-        <div className="space-y-1">
-          <p className="px-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-            {title}
-          </p>
-          <ul className="space-y-0.5">
-            {items.map((item) => {
-              const active = isActive(item.href);
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className={`relative flex min-h-9 items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm ${
-                      active
-                        ? "bg-blue-50 font-semibold text-blue-700"
-                        : "text-[var(--secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)]"
-                    }`}
-                  >
-                    {active && (
-                      <span
-                        aria-hidden="true"
-                        className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-blue-700"
-                      />
-                    )}
-                    <NavIcon name={item.icon} />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      );
-    };
-
-    return (
-      <div className="flex h-full flex-col">
-        <div className="flex h-14 items-center border-b px-4">
-          <Link href="/dashboard" className="min-w-0 flex-1 rounded-lg focus-visible:outline-offset-4">
-            <BrandMark />
-          </Link>
-        </div>
-
-        <nav aria-label="Menu Utama" className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
-          {renderSection("Operasional", operationalLinks)}
-          {renderSection("Inventaris & Stok", inventoryLinks)}
-          {renderSection("Administrasi", adminLinks)}
-        </nav>
-
-        <div className="border-t p-3">
-          <div className="flex items-center gap-2.5 rounded-lg bg-[var(--surface-muted)] px-2.5 py-2">
-            <div
-              aria-hidden="true"
-              className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#1d4ed8] text-xs font-semibold text-white"
-            >
-              {initials || "U"}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-[var(--foreground)]">
-                {userName}
-              </p>
-              <p className="truncate text-[11px] text-[var(--muted)]">
-                <span className="font-semibold uppercase">{role}</span>
-                {userEmail ? ` · ${userEmail}` : ""}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void handleSignOut()}
-            disabled={signingOut}
-            className="mt-2 flex min-h-9 w-full items-center justify-center gap-2 rounded-lg border bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--secondary)] hover:bg-[var(--surface-muted)] hover:text-[var(--foreground)] disabled:opacity-50"
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-3.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" />
-            </svg>
-            {signingOut ? "Keluar..." : "Keluar"}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex min-h-screen flex-1 bg-[var(--background)]">
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex lg:w-60 lg:flex-col lg:border-r lg:bg-[var(--surface)]">
-        {renderNavContent()}
-      </aside>
+    <>
+      <button
+        ref={menuButtonRef}
+        type="button"
+        onClick={() => setOpenForPath(pathname)}
+        aria-label="Buka menu navigasi"
+        aria-expanded={drawerOpen}
+        className="inline-flex size-9 items-center justify-center rounded-lg border bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-muted)] lg:hidden"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className="size-5"
+        >
+          <path strokeLinecap="round" d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+      </button>
 
-      {/* Mobile Drawer */}
       {drawerOpen && (
         <div
           className="fixed inset-0 z-50 flex lg:hidden"
@@ -304,47 +419,128 @@ export default function AppShell({
                 aria-label="Tutup menu navigasi"
                 className="inline-flex size-9 items-center justify-center rounded-lg border bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-muted)]"
               >
-                <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="size-4"
+                >
                   <path strokeLinecap="round" d="M6 6l12 12M18 6l-12 12" />
                 </svg>
               </button>
             </div>
-            {renderNavContent()}
+            <div className="flex h-full flex-col">
+              <div className="flex h-14 items-center border-b px-4">
+                <Link
+                  href="/dashboard"
+                  onNavigate={() => setOpenForPath(null)}
+                  className="min-w-0 flex-1 rounded-lg focus-visible:outline-offset-4"
+                >
+                  <BrandMark />
+                </Link>
+              </div>
+              <AppShellNavBody
+                {...props}
+                onNavigate={() => setOpenForPath(null)}
+              />
+            </div>
           </div>
         </div>
       )}
+    </>
+  );
+}
+
+export function AppShellHeaderTitle() {
+  const pathname = usePathname();
+  const meta = getAppRouteMeta(pathname);
+
+  return (
+    <h1 className="truncate text-base font-semibold text-[var(--foreground)] sm:text-lg">
+      {meta.title}
+    </h1>
+  );
+}
+
+export function AppShellHeaderAction({ role }: { role: string }) {
+  const pathname = usePathname();
+  const meta = getAppRouteMeta(pathname, role);
+
+  if (!meta.action) return null;
+
+  return (
+    <Link
+      href={meta.action.href}
+      className={
+        meta.action.primary
+          ? "inline-flex min-h-9 items-center rounded-lg bg-[#1d4ed8] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1e40af]"
+          : "inline-flex min-h-9 items-center rounded-lg border bg-[var(--surface)] px-3 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface-muted)]"
+      }
+    >
+      {meta.action.label}
+    </Link>
+  );
+}
+
+export function AppShellHeaderSubtitle() {
+  const pathname = usePathname();
+  const meta = getAppRouteMeta(pathname);
+
+  if (!meta.subtitle) return null;
+
+  return <p className="mb-5 text-sm text-[var(--muted)]">{meta.subtitle}</p>;
+}
+
+export function AppShellFrame({
+  sidebarSlot,
+  mobileNavSlot,
+  headerTitleSlot,
+  headerActionSlot,
+  subtitleSlot,
+  children,
+}: {
+  sidebarSlot: ReactNode;
+  mobileNavSlot: ReactNode;
+  headerTitleSlot: ReactNode;
+  headerActionSlot: ReactNode;
+  subtitleSlot: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex min-h-screen flex-1 bg-[var(--background)]">
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-20 lg:flex lg:w-60 lg:flex-col lg:border-r lg:bg-[var(--surface)]">
+        <div className="flex h-full flex-col">
+          <div className="flex h-14 items-center border-b px-4">
+            <Link
+              href="/dashboard"
+              className="min-w-0 flex-1 rounded-lg focus-visible:outline-offset-4"
+            >
+              <BrandMark />
+            </Link>
+          </div>
+          {sidebarSlot}
+        </div>
+      </aside>
 
       {/* Workspace Column */}
       <div className="flex min-w-0 flex-1 flex-col lg:pl-60">
         <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between gap-3 border-b bg-[var(--surface)]/95 px-4 backdrop-blur-xs sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <button
-              ref={menuButtonRef}
-              type="button"
-              onClick={() => setOpenForPath(pathname)}
-              aria-label="Buka menu navigasi"
-              aria-expanded={drawerOpen}
-              className="inline-flex size-9 items-center justify-center rounded-lg border bg-[var(--surface)] text-[var(--foreground)] hover:bg-[var(--surface-muted)] lg:hidden"
-            >
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="size-5">
-                <path strokeLinecap="round" d="M4 7h16M4 12h16M4 17h16" />
-              </svg>
-            </button>
-            <h1 className="truncate text-base font-semibold text-[var(--foreground)] sm:text-lg">
-              {pageTitle}
-            </h1>
+            {mobileNavSlot}
+            {headerTitleSlot}
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            {headerAction}
+            {headerActionSlot}
             <ThemeToggle />
           </div>
         </header>
 
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8">
-          {pageSubtitle && (
-            <p className="mb-5 text-sm text-[var(--muted)]">{pageSubtitle}</p>
-          )}
+          {subtitleSlot}
           <div className="space-y-6">{children}</div>
         </main>
       </div>

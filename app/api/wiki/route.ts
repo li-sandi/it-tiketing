@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -133,6 +134,8 @@ export async function POST(request: Request) {
     console.error("Gagal menyimpan artikel wiki:", error.message);
     return jsonError("Gagal menyimpan artikel wiki.", 500);
   }
+
+  revalidateTag("wiki", { expire: 0 });
 
   return NextResponse.json(
     { ok: true, article: data },

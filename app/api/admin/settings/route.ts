@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { logAdminAction } from "@/lib/admin-audit";
 import { getAdminUser } from "@/lib/admin-auth";
@@ -78,6 +79,8 @@ export async function PATCH(request: Request) {
     { onConflict: "kunci" },
   );
   if (error) return jsonError("Gagal menyimpan pengaturan.", 500);
+
+  revalidateTag("settings", { expire: 0 });
 
   await logAdminAction({
     aktorId: adminUser.user.id,

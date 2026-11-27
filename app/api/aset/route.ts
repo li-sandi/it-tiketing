@@ -1,3 +1,4 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -122,6 +123,9 @@ export async function POST(request: Request) {
   if (error) {
     return jsonError(`Gagal menyimpan aset: ${error.message}`, 400);
   }
+
+  revalidateTag("assets", { expire: 0 });
+
   return NextResponse.json(
     { ok: true, asset: data },
     { status: 201, headers: { "Cache-Control": "no-store" } },

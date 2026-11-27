@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cacheLife, cacheTag } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type FeatureFlags = {
@@ -48,21 +49,42 @@ const DEFAULT_WEEKLY_REPORT: WeeklyReportSetting = {
   chat_ids: [],
 };
 
+async function getAllSettingsMap(): Promise<
+  Record<string, Record<string, unknown>>
+> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("settings");
+
+  const admin = createAdminClient();
+  const { data, error } = await admin.from("settings").select("kunci, nilai");
+  if (error) {
+    throw new Error(`Gagal memuat pengaturan: ${error.message}`);
+  }
+
+  const map: Record<string, Record<string, unknown>> = {};
+  for (const row of data ?? []) {
+    if (
+      row.kunci &&
+      row.nilai &&
+      typeof row.nilai === "object" &&
+      !Array.isArray(row.nilai)
+    ) {
+      map[row.kunci] = row.nilai as Record<string, unknown>;
+    }
+  }
+  return map;
+}
+
 export async function getSetting<T extends Record<string, unknown>>(
   kunci: string,
   fallback: T,
 ): Promise<T> {
   try {
-    const admin = createAdminClient();
-    const { data, error } = await admin
-      .from("settings")
-      .select("nilai")
-      .eq("kunci", kunci)
-      .maybeSingle();
-    if (error || !data?.nilai || typeof data.nilai !== "object") {
-      return fallback;
-    }
-    return { ...fallback, ...(data.nilai as Partial<T>) };
+    const map = await getAllSettingsMap();
+    const raw = map[kunci];
+    if (!raw) return fallback;
+    return { ...fallback, ...(raw as Partial<T>) };
   } catch {
     return fallback;
   }

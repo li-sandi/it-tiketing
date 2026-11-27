@@ -173,7 +173,16 @@ export async function POST(request: Request) {
     return jsonError("Lampiran foto remote tidak valid.", 400);
   }
 
-  const admin = createAdminClient();
+  let admin: ReturnType<typeof createAdminClient>;
+  try {
+    admin = createAdminClient();
+  } catch (err) {
+    console.error(
+      "Konfigurasi Supabase admin tidak tersedia untuk tiket publik:",
+      err instanceof Error ? err.message : err,
+    );
+    return jsonError("Gagal membuat tiket. Silakan coba lagi.", 500);
+  }
   const [
     { data: category, error: categoryError },
     { data: site, error: siteError },

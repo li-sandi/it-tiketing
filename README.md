@@ -1,6 +1,6 @@
 # IT Ticketing
 
-Aplikasi pelaporan, antrian SLA, inventaris aset, Wiki SOP, dan pelaporan beban kerja tim IT berbasis Next.js 16, Supabase, Redis, dan Telegram.
+Aplikasi pelaporan, antrian SLA, inventaris aset, Wiki SOP, dan pelaporan beban kerja tim IT berbasis Next.js 16.4.6 (Cache Components & Partial Prefetching), Supabase (`@supabase/ssr`), Redis, dan Telegram.
 
 Fokus operasional saat ini: **Debito Jogja** (400 user, 1 entitas site aktif).
 
@@ -77,6 +77,7 @@ Fokus operasional saat ini: **Debito Jogja** (400 user, 1 entitas site aktif).
 ```bash
 npm run dev      # server development
 npm run test     # unit test (Vitest)
+npx vitest run --config vitest.e2e.config.ts # E2E test suite (Tiers 1–4)
 npm run lint     # ESLint
 npx tsc --noEmit # TypeScript check
 npm run build    # production build
@@ -86,7 +87,8 @@ npm run build    # production build
 
 Rincian lengkap setiap perubahan (migrasi database `0020`–`0031`, endpoint API, perbaikan bug, komponen UI, pengujian, CI, dan paket on-premise) didokumentasikan di [CHANGELOG.md](./CHANGELOG.md).
 
-Ringkasan rilis terbaru (**2026-11-26 — Hardening Keamanan, Audit Admin, Peningkatan UX, & CI**):
+Ringkasan rilis terbaru (**2026-11-26 — Optimasi Performa Navigasi, Cache Components, E2E & Tier-5**):
+- Optimasi performa navigasi lintas halaman Next.js 16.4.6 (`cacheComponents: true`, `partialPrefetching: true`), `proxy.ts` bypass tanpa cookie auth, DAL tercache (`lib/auth.ts`, `lib/settings.ts`, `lib/data/*`) dengan invalidasi tag, shared `app/(app)/layout.tsx` App Shell + `<Suspense>` streaming (`0` halaman `ƒ Dynamic`), reset state `<Activity>`, suite E2E Tiers 1–4 (`vitest.e2e.config.ts`) & hardening Tier-5.
 - Penutupan kebocoran ID AnyDesk/UV anonim pada `/api/tiket/remote-ids` & pembatasan akses `/api/aset/lookup`, penautan ID aset di server, audit perubahan admin (`0031_admin_audit_logs.sql`, `/admin/audit`), serta `.github/workflows/ci.yml` dan `scripts/verify-rls.sql`.
 - Peningkatan UX operasional: tabel interaktif desktop + kartu mobile di `/antrian` dan `/tiket`, pratinjau prioritas & SLA sebelum kirim, progress bar SLA, toast & dialog konfirmasi aksesibel, serta skeleton loading pada rute utama.
 - Pembaruan antarmuka bergaya Corporate Service Desk di seluruh halaman & komponen dalam dengan navigasi Sidebar + Top Bar responsif (`AppShell`), dukungan mode terang/gelap terverifikasi kontras WCAG AA, dan portal beranda SLA.

@@ -38,6 +38,32 @@ export function escapeCsvCell(value: unknown): string {
   return formulaSafe;
 }
 
+export const MIN_REPORT_YEAR = 2000;
+export const MAX_REPORT_YEAR = 2100;
+
+export function normalizeReportYear(
+  raw: unknown,
+  fallbackYear = new Date().getUTCFullYear(),
+): number {
+  const num = typeof raw === "number" ? raw : Number(raw);
+  if (
+    !Number.isSafeInteger(num) ||
+    num < MIN_REPORT_YEAR ||
+    num > MAX_REPORT_YEAR
+  ) {
+    return fallbackYear;
+  }
+  return num;
+}
+
+export function normalizeReportQuarter(raw: unknown): number {
+  const num = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isSafeInteger(num) || num < 1 || num > 4) {
+    return 1;
+  }
+  return num;
+}
+
 export function formatPeriodRange(params: {
   periode: ReportPeriod;
   tahun: number;
@@ -54,9 +80,9 @@ export function formatPeriodRange(params: {
       label: "7 Hari Terakhir",
     };
   }
+  const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
   if (params.periode === "bulanan") {
-    const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
-    const year = params.tahun || wib.getUTCFullYear();
+    const year = normalizeReportYear(params.tahun, wib.getUTCFullYear());
     const month = wib.getUTCMonth();
     const start = new Date(Date.UTC(year, month, 1, -7, 0, 0));
     const end = new Date(Date.UTC(year, month + 1, 1, -7, 0, 0));
@@ -71,14 +97,15 @@ export function formatPeriodRange(params: {
     };
   }
 
-  const q = Math.min(4, Math.max(1, params.kuartal ?? 1));
+  const year = normalizeReportYear(params.tahun, wib.getUTCFullYear());
+  const q = normalizeReportQuarter(params.kuartal);
   const startMonth = (q - 1) * 3;
-  const start = new Date(Date.UTC(params.tahun, startMonth, 1, -7, 0, 0));
-  const end = new Date(Date.UTC(params.tahun, startMonth + 3, 1, -7, 0, 0));
+  const start = new Date(Date.UTC(year, startMonth, 1, -7, 0, 0));
+  const end = new Date(Date.UTC(year, startMonth + 3, 1, -7, 0, 0));
   return {
     start,
     end,
-    label: `Q${q} ${params.tahun}`,
+    label: `Q${q} ${year}`,
   };
 }
 

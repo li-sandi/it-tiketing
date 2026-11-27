@@ -55,6 +55,15 @@ Pelapor memilih **Kelompok Kategori** (`Network & VPN`, `Hardware & Periferal`, 
 - Perubahan kategori, site, peran user, dan pengaturan sistem dicatat ke tabel `admin_audit_logs` (`0031_admin_audit_logs.sql`) dan dapat ditinjau di `/admin/audit`.
 - Menu `/admin/jadwal` otomatis disembunyikan selama `feature_flags.sleman_routing_enabled = false`.
 
+### 3.5 Arsitektur Navigasi, Caching, & Keamanan Sesi (Next.js 16)
+- **`cacheComponents: true` & `partialPrefetching: true` (`next.config.ts`):** Seluruh rute publik statis (`/`, `/lapor`, `/login`) di-prerender penuh (`○ Static`), sementara seluruh rute terautentikasi di `app/(app)/*` dan `/status/[token]` menggunakan Partial Prerendering (`◐ Partial Prerender`) dengan App Shell bersama serta streaming `<Suspense>` sehingga tidak ada halaman `ƒ Dynamic`.
+- **Shared App Shell & Streaming (`app/(app)/layout.tsx`, `loading.tsx`, `next/form`):** `AppShellFrame` dipasang satu kali di `app/(app)/layout.tsx` (sidebar & top bar tetap menempel saat berpindah rute, sementara `app/(app)/admin/layout.tsx` hanya menegakkan otorisasi `admin` tanpa memasang ulang `AppShell`). Slot profil/navigasi serta konten dinamis diletakkan di dalam `<Suspense>` fokus, dilengkapi skeleton `loading.tsx` dan `next/form` `<Form>` untuk filter tanpa full reload di `/tiket` dan `/laporan`.
+- **Isolasi Sesi `proxy.ts` & `@supabase/ssr`:** `proxy.ts` berjalan di runtime Node.js, melewati `createServerClient()` bila tidak ada cookie `sb-*-auth-token` (nol overhead pada rute publik), hanya memanggil `supabase.auth.getClaims()` tanpa query DB aplikasi, dan fallback aman ke `NextResponse.next()` jika variabel env publik Supabase belum diset.
+- **Lapisan Caching Bertingkat (`"use cache: private"` vs `"use cache"`):**
+  - `lib/auth.ts`: `getCurrentUserSession()` dan `getCurrentUserProfile()` memakai `React.cache()` + `"use cache: private"` (`cacheLife({ stale: 60, revalidate: 60, expire: 300 })`, sehingga data sesi tidak pernah masuk cache server bersama) serta meneruskan `userId` ke helper unexported `"use cache"` bertag `users` dan `user-profile:${userId}`. Server Actions dan mutasi sensitif tetap memakai `requireAuthUser()` (`supabase.auth.getUser()` langsung).
+  - `lib/settings.ts` & `lib/data/*`: Data referensi (`settings`, `categories`, `sites`, `inventory_stocks`, `knowledge_articles`, `assets`, `users`, `it_schedule`) dibaca dengan client admin cookie-free di dalam `"use cache"` + `cacheLife` + `cacheTag`, lalu diinvalidasi oleh Route Handlers mutasi lewat `revalidateTag(tag, { expire: 0 })` (atau `updateTag` di Server Actions).
+- **Manajemen State `<Activity>` & Hardening Boundary:** Logout di `AppShell.tsx` menggunakan `window.location.href = "/login"` agar seluruh state React `<Activity>` terhapus bersih; `PublicTicketForm.tsx` dan `TicketForm.tsx` mereset `loading` serta input form saat submit berhasil maupun lewat `useLayoutEffect` cleanup; route `/status/[token]`, `/tiket`, serta endpoint publik/mutasi menjaga error env/batas parameter (`tahun` `2000–2100`, `kuartal` `1–4`) serta validasi CSRF `Origin` (`403`) + `Cache-Control: no-store`.
+
 ---
 
 ## 4. Endpoint API Utama
@@ -88,7 +97,8 @@ Pelapor memilih **Kelompok Kategori** (`Network & VPN`, `Hardware & Periferal`, 
 
 ## 5. Pengujian & Verifikasi
 
-- **Unit test:** `npm run test` (Vitest pada `lib/__tests__/*.test.ts`)
+- **Unit test:** `npm run test` (Vitest pada `lib/__tests__/*.test.ts`, mencakup DAL caching, `proxy.ts`, `auth.ts`, `settings.ts`, `actions.ts`, hardening API, SLA, prioritas, CSV, & kriptografi)
+- **E2E test (Tiers 1–4):** `npx vitest run --config vitest.e2e.config.ts` setelah `npm run build` (verifikasi klasifikasi `.next`, reachability & proteksi auth 20 rute + 35 endpoint API, boundary/CSRF, aliran RSC/Partial Prefetching, dan skenario browser CDP headless; tambahkan `E2E_REQUIRE_LIVE_DB=1` + kredensial `E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD` untuk skenario terautentikasi penuh)
 - **Lint & Typecheck:** `npm run lint && npx tsc --noEmit`
 - **Build:** `npm run build`
 - **Verifikasi RLS Database:** Jalankan [scripts/verify-rls.sql](../scripts/verify-rls.sql) pada SQL Editor Supabase untuk memverifikasi status RLS & policy 12 tabel inti.
@@ -98,4 +108,4 @@ Pelapor memilih **Kelompok Kategori** (`Network & VPN`, `Hardware & Periferal`, 
 
 ## 6. Riwayat Perubahan
 
-Seluruh catatan perubahan per tanggal, daftar berkas yang ditambah/diubah/dihapus, dan migrasi terkait terdokumentasi lengkap di [CHANGELOG.md](../CHANGELOG.md).
+Seluruh catatan perubahan per tanggal, daftar berkas yang ditambah/diubah/dihapus, hasil benchmark performa navigasi, serta migrasi terkait terdokumentasi lengkap di [CHANGELOG.md](../CHANGELOG.md).
